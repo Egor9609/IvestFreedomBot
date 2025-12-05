@@ -1,0 +1,95 @@
+finbot-kolyan/
+├── bot/
+│   ├── main.py
+│   ├── config.py
+│   ├── requirements.txt
+│   ├── .env.example
+│   └── README.md
+│
+├── database/
+│   ├── __init__.py
+│   ├── session.py
+│   ├── models.py
+│   └── repository.py
+│
+├── handlers/
+│   ├── __init__.py
+│   ├── base.py
+│   ├── finance/
+│   │   ├── __init__.py
+│   │   ├── income.py
+│   │   ├── expense.py
+│   │   └── reports.py
+│   ├── debts/
+│   │   ├── __init__.py
+│   │   ├── add.py
+│   │   ├── payments.py
+│   │   ├── list.py
+│   │   ├── edit.py
+│   │   └── delete.py
+│   ├── bills/
+│   │   ├── __init__.py
+│   │   ├── add.py
+│   │   ├── list.py
+│   │   ├── edit.py
+│   │   └── payments.py
+│   └── admin/
+│       ├── __init__.py
+│       ├── users.py
+│       ├── transactions.py
+│       ├── debts.py
+│       ├── bills.py
+│       └── admin_management.py
+│
+├── keyboards/
+│   ├── __init__.py
+│   ├── base.py
+│   ├── finance.py
+│   ├── debts.py
+│   ├── bills.py
+│   └── admin.py
+│
+├── services/
+│   ├── __init__.py
+│   ├── finance_service.py
+│   ├── debt_service.py
+│   ├── bill_service.py
+│   ├── admin_service.py
+│   └── export_service.py
+│
+├── states/
+│   ├── __init__.py
+│   ├── finance_states.py
+│   ├── debt_states.py
+│   └── bill_states.py
+│
+├── utils/
+│   ├── __init__.py
+│   ├── validators.py
+│   ├── formatters.py
+│   ├── parsers.py
+│   ├── admin_utils.py
+│   ├── callbacks.py
+│   └── helpers.py
+│
+├── scheduler/
+│   ├── __init__.py
+│   └── jobs.py
+│
+├── middleware/
+│   ├── __init__.py
+│   ├── logging_middleware.py
+│   └── user_middleware.py
+│
+├── data/
+│   ├── admins.txt
+│   ├── exports/
+│   ├── database/
+│   │   └── finance.db
+│   └── logs/
+│
+├── test/
+│   ├── __init__.py
+│   └── test_example.py
+│
+└── .env
