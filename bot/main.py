@@ -5,6 +5,7 @@ from aiogram import Bot, Dispatcher
 from bot.config import BOT_TOKEN
 from bot.handlers import register_all_routers
 from bot.logger import logger  # подключим, чтобы инициализировать
+from bot.data.database import create_db_and_tables
 
 # Включаем логирование (опционально)
 logging.basicConfig(level=logging.INFO)
@@ -12,6 +13,9 @@ logging.basicConfig(level=logging.INFO)
 async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
+
+    # Создаём таблицы при запуске
+    await create_db_and_tables()
 
     register_all_routers(dp)
 
