@@ -1,4 +1,5 @@
 # database/__init__.py
+from sqlalchemy.ext.asyncio import async_engine_from_config
 from .models import Base
 from .session import engine
 
