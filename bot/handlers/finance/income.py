@@ -10,10 +10,11 @@ from bot.keyboards.base import main_menu  # Главное меню
 from bot.logger import logger
 from database.repository import UserRepository, TransactionRepository
 from database.session import get_session
+from bot.services.finance_service import FinanceService
 
 router = Router()
 
-print("✅ bot/handlers/finance/income.py ЗАГРУЖЕН")
+print("✅ bot/handlers/finance/income.py Загружается")
 
 @router.message(lambda m: m.text == "💰 Доходы")
 async def handle_income_button(message: Message, state: FSMContext):
@@ -59,37 +60,27 @@ async def cmd_income_description(message: Message, state: FSMContext):
     data = await state.get_data()
     amount = data.get("amount")
 
-    # Получаем сессию и работаем с БД
-    async for session in get_session():
-        try:
-            user_repo = UserRepository(session)
-            transaction_repo = TransactionRepository(session)
+    # Вызываем сервис — вся логика здесь
+    result = await FinanceService.add_income(
+        telegram_id=message.from_user.id,
+        username=message.from_user.username,
+        full_name=message.from_user.full_name,
+        amount=amount,
+        description=description
+    )
 
-            user = await user_repo.get_or_create_user(
-                telegram_id=message.from_user.id,
-                username=message.from_user.username,
-                full_name=message.from_user.full_name
-            )
+    if result["success"]:
+        desc_text = description if description else "—"
+        response = (
+            "✅ Доход добавлен!\n"
+            f"Сумма: {amount:.2f} руб.\n"
+            f"Примечание: {desc_text}"
+        )
+        await message.answer(response, reply_markup=main_menu)
+    else:
+        logger.error(f"Ошибка при добавлении дохода: {result['error']}")
+        await message.answer("Произошла ошибка при добавлении дохода. Попробуйте позже.", reply_markup=main_menu)
 
-            await transaction_repo.add_transaction(
-                user_id=user.id,
-                type="income",
-                amount=amount,
-                description=description
-            )
+    await state.clear()
 
-            # Форматируем вывод
-            desc_text = description if description else "—"
-            response = (
-                "✅ Доход добавлен!\n"
-                f"Сумма: {amount:.2f} руб.\n"
-                f"Примечание: {desc_text}"
-            )
-            await message.answer(response, reply_markup=main_menu)
-
-        except Exception as e:
-            logger.error(f"Ошибка при добавлении дохода: {e}", exc_info=True)
-            await message.answer("Произошла ошибка при добавлении дохода. Попробуйте позже.", reply_markup=main_menu)
-
-        finally:
-            await state.clear()
+print("✅ bot/handlers/finance/income.py ЗАГРУЖЕН")
