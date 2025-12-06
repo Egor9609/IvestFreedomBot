@@ -3,6 +3,7 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
+from aiogram import F
 
 from bot.states.finance_states import ExpenseStates
 from bot.keyboards.finance import expense_cancel_keyboard, expense_description_keyboard
@@ -36,7 +37,7 @@ async def cmd_expense_amount(message: Message, state: FSMContext):
 
     await state.update_data(amount=amount)
     await state.set_state(ExpenseStates.waiting_for_description)
-    await message.answer("Введите описание расхода (либо нажмите “Пропустить”):", reply_markup=expense_description_keyboard)
+    await message.answer("Введите описание расхода:", reply_markup=expense_description_keyboard)
 
 
 @router.message(ExpenseStates.waiting_for_description)
@@ -84,3 +85,8 @@ async def cmd_expense_description(message: Message, state: FSMContext):
         await message.answer("Не удалось добавить расход. Попробуйте позже.", reply_markup=main_menu)
 
     await state.clear()
+
+@router.message(F.text == "💸 Расходы")
+async def btn_expense(message: Message, state: FSMContext):
+    # Эмулируем команду /expense
+    await cmd_expense_start(message, state)
