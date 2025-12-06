@@ -1,9 +1,10 @@
 # bot/logger.py
 import logging
 import os
+from bot.config import PROJECT_ROOT  # Используем PROJECT_ROOT из config
 
 # Убедимся, что папка logs существует
-log_dir = "data/logs"
+log_dir = os.path.join(PROJECT_ROOT, "data", "logs")
 os.makedirs(log_dir, exist_ok=True)
 
 # Настраиваем логгер

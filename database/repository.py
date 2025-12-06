@@ -1,5 +1,5 @@
 # database/repository.py
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.models import User, Transaction
 
@@ -27,6 +27,19 @@ class UserRepository:
 
         return user
 
+    async def get_user_by_id(self, user_id: int):
+        stmt = select(User).where(User.id == user_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def update_user_status(self, user_id: int, is_active: bool):
+        user = await self.get_user_by_id(user_id)
+        if user:
+            user.is_active = is_active
+            await self.session.commit()
+            await self.session.refresh(user)
+        return user
+
 class TransactionRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -43,3 +56,26 @@ class TransactionRepository:
         await self.session.commit()
         await self.session.refresh(transaction)
         return transaction
+
+    async def get_transactions_by_user(self, user_id: int):
+        stmt = select(Transaction).where(Transaction.user_id == user_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def get_total_income_by_user(self, user_id: int):
+        stmt = select(func.sum(Transaction.amount)).where(
+            Transaction.user_id == user_id,
+            Transaction.type == "income"
+        )
+        result = await self.session.execute(stmt)
+        total = result.scalar()
+        return total or 0.0
+
+    async def get_total_expense_by_user(self, user_id: int):
+        stmt = select(func.sum(Transaction.amount)).where(
+            Transaction.user_id == user_id,
+            Transaction.type == "expense"
+        )
+        result = await self.session.execute(stmt)
+        total = result.scalar()
+        return total or 0.0

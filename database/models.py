@@ -1,5 +1,6 @@
 # database/models.py
 from sqlalchemy import Integer, String, DateTime, Numeric, Boolean, ForeignKey
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
