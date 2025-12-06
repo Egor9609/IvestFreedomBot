@@ -50,7 +50,6 @@ class TransactionRepository:
             type=type,
             amount=amount,
             description=description,
-            date=date
         )
         self.session.add(transaction)
         await self.session.commit()
