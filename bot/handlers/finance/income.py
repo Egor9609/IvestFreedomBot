@@ -5,7 +5,8 @@ from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 
 from bot.states.finance_states import IncomeStates
-from bot.keyboards.finance import cancel_keyboard
+from bot.keyboards.finance import description_keyboard, cancel_keyboard
+from bot.keyboards.base import main_menu  # Главное меню
 from bot.logger import logger
 from database.repository import UserRepository, TransactionRepository
 from database.session import get_session
@@ -29,31 +30,31 @@ async def cmd_income_start(message: Message, state: FSMContext):
 async def cmd_income_amount(message: Message, state: FSMContext):
     if message.text == "❌ Отмена":
         await state.clear()
-        await message.answer("Добавление дохода отменено.")
+        await message.answer("✅ Добавление дохода отменено.", reply_markup=main_menu)
         return
 
     try:
         amount = float(message.text.replace(',', '.'))
+        if amount <= 0:
+            await message.answer("Сумма должна быть больше нуля. Попробуйте снова:")
+            return
     except ValueError:
-        await message.answer("Пожалуйста, введите корректную сумму.")
+        await message.answer("Пожалуйста, введите корректную сумму (например: 1500.50):")
         return
 
     await state.update_data(amount=amount)
     await state.set_state(IncomeStates.waiting_for_description)
-    await message.answer("Введите описание дохода (или нажмите 'Пропустить'):")
+    await message.answer("Введите описание дохода (либо нажмите “Пропустить”):", reply_markup=description_keyboard)
 
 
 @router.message(IncomeStates.waiting_for_description)
 async def cmd_income_description(message: Message, state: FSMContext):
     if message.text == "❌ Отмена":
         await state.clear()
-        await message.answer("Добавление дохода отменено.")
+        await message.answer("✅ Добавление дохода отменено.", reply_markup=main_menu)
         return
 
-    if message.text == "Пропустить":
-        description = None
-    else:
-        description = message.text
+    description = None if message.text == "Пропустить" else message.text
 
     data = await state.get_data()
     amount = data.get("amount")
@@ -77,12 +78,18 @@ async def cmd_income_description(message: Message, state: FSMContext):
                 description=description
             )
 
-            await session.commit()
-            await message.answer(f"Доход в размере {amount} добавлен!")
+            # Форматируем вывод
+            desc_text = description if description else "—"
+            response = (
+                "✅ Доход добавлен!\n"
+                f"Сумма: {amount:.2f} руб.\n"
+                f"Примечание: {desc_text}"
+            )
+            await message.answer(response, reply_markup=main_menu)
 
         except Exception as e:
             logger.error(f"Ошибка при добавлении дохода: {e}", exc_info=True)
-            await message.answer("Произошла ошибка при добавлении дохода. Попробуйте позже.")
+            await message.answer("Произошла ошибка при добавлении дохода. Попробуйте позже.", reply_markup=main_menu)
 
         finally:
             await state.clear()
