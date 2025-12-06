@@ -8,8 +8,6 @@ from bot.states.finance_states import IncomeStates
 from bot.keyboards.finance import description_keyboard, cancel_keyboard
 from bot.keyboards.base import main_menu  # Главное меню
 from bot.logger import logger
-from database.repository import UserRepository, TransactionRepository
-from database.session import get_session
 from bot.services.finance_service import FinanceService
 
 router = Router()

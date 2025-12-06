@@ -1,10 +1,10 @@
 # bot/handlers/base.py
-from aiogram import Router, types
+from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 from bot.keyboards.base import main_menu
-from database.repository import UserRepository
-from database.session import get_session
+from bot.database.repository import UserRepository
+from bot.database.session import get_session
 
 router = Router()
 

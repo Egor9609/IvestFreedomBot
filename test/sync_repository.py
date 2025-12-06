@@ -1,6 +1,6 @@
 # test/sync_repository.py
 from sqlalchemy import select
-from database.models import User, Transaction
+from bot.database.models import User, Transaction
 
 
 class SyncUserRepository:

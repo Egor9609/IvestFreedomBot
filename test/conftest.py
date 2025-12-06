@@ -2,7 +2,7 @@
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from database.models import Base
+from bot.database.models import Base
 
 
 # Используем отдельную тестовую БД в памяти

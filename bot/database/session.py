@@ -1,4 +1,4 @@
-# database/session.py
+# bot/database/session.py
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine

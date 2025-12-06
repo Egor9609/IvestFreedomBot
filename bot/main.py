@@ -6,7 +6,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from bot.config import BOT_TOKEN
 from bot.handlers import register_all_routers
 from bot.logger import logger  # подключим, чтобы инициализировать
-from database import create_db_and_tables
+from bot.database import create_db_and_tables
 
 # Включаем логирование (опционально)
 logging.basicConfig(level=logging.INFO)

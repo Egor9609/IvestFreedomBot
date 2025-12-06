@@ -1,22 +1,19 @@
 # services/finance_service.py
 from typing import Optional
-from database.repository import UserRepository, TransactionRepository
-from database.session import get_session
+from bot.database.repository import UserRepository, TransactionRepository
+from bot.database.session import get_session
 
 
 class FinanceService:
     @staticmethod
-    async def add_income(
+    async def add_transaction(
         telegram_id: int,
         username: Optional[str],
         full_name: Optional[str],
         amount: float,
+        transaction_type: str,  # "income" или "expense"
         description: Optional[str] = None
     ) -> dict:
-        """
-        Добавляет доход пользователя в базу данных.
-        Возвращает словарь с результатом: {'success': bool, 'error': str или None}
-        """
         async for session in get_session():
             try:
                 user_repo = UserRepository(session)
@@ -30,7 +27,7 @@ class FinanceService:
 
                 await transaction_repo.add_transaction(
                     user_id=user.id,
-                    type="income",
+                    type=transaction_type,
                     amount=amount,
                     description=description
                 )
@@ -41,3 +38,12 @@ class FinanceService:
             except Exception as e:
                 await session.rollback()
                 return {"success": False, "error": str(e)}
+
+    # Удобные обёртки (опционально)
+    @staticmethod
+    async def add_income(*args, **kwargs):
+        return await FinanceService.add_transaction(*args, transaction_type="income", **kwargs)
+
+    @staticmethod
+    async def add_expense(*args, **kwargs):
+        return await FinanceService.add_transaction(*args, transaction_type="expense", **kwargs)

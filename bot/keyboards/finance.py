@@ -20,3 +20,6 @@ cancel_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True,
     one_time_keyboard=True
 )
+
+expense_cancel_keyboard = cancel_keyboard
+expense_description_keyboard = description_keyboard

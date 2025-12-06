@@ -1,7 +1,7 @@
-# database/repository.py
+# bot/database/repository.py
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from database.models import User, Transaction
+from bot.database.models import User, Transaction
 
 
 class UserRepository:

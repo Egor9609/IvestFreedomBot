@@ -1,4 +1,4 @@
-# database/models.py
+# bot/database/models.py
 from datetime import datetime
 from sqlalchemy import Integer, String, DateTime, Numeric, Boolean, ForeignKey
 from sqlalchemy import select, func
