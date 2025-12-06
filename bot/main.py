@@ -2,6 +2,7 @@
 import asyncio
 import logging
 from aiogram import Bot, Dispatcher
+from aiogram.fsm.storage.memory import MemoryStorage
 from bot.config import BOT_TOKEN
 from bot.handlers import register_all_routers
 from bot.logger import logger  # подключим, чтобы инициализировать
@@ -12,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 
 async def main():
     bot = Bot(token=BOT_TOKEN)
-    dp = Dispatcher()
+    dp = Dispatcher(storage=MemoryStorage())
 
     # Создаём таблицы при запуске
     await create_db_and_tables()
@@ -30,5 +31,3 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logger.info("Бот остановлен.")
-    except Exception as e:
-        logger.error(f"Критическая ошибка при запуске: {e}", exc_info=True)
