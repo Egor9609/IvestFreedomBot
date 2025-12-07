@@ -3,7 +3,7 @@ from typing import Optional
 from bot.database.repository import UserRepository, TransactionRepository
 from bot.database.session import get_session
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 
 MSK = pytz.timezone('Europe/Moscow')
