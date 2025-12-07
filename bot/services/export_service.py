@@ -32,21 +32,21 @@ class ExportService:
             now = datetime.now(MSK)
             if period == "day":
                 date_str = now.strftime("%d.%m.%Y")
-                filename = f"Отчёт_{date_str}.xlsx"
+                filename = f"Отчёт_за_{date_str}.xlsx"
             elif period == "week":
                 start = now - timedelta(days=now.weekday())
                 date_str = f"{start.strftime('%d.%m.%Y')}-{now.strftime('%d.%m.%Y')}"
-                filename = f"Отчёт_неделя_{date_str}.xlsx"
+                filename = f"Отчёт_за_неделю_{date_str}.xlsx"
             elif period == "month":
                 date_str = now.strftime("%m.%Y")
-                filename = f"Отчёт_месяц_{date_str}.xlsx"
+                filename = f"Отчёт_за_месяц_{date_str}.xlsx"
             elif period == "year":
                 date_str = str(now.year)
-                filename = f"Отчёт_год_{date_str}.xlsx"
+                filename = f"Отчёт_за_год_{date_str}.xlsx"
             else:
                 filename = "Отчёт.xlsx"
 
-            # Подготавливаем данные
+            # Сбор данных
             data = []
             total_income = 0.0
             total_expense = 0.0
@@ -65,29 +65,28 @@ class ExportService:
                     "Описание": t.description or "—"
                 })
 
-            # Создаём DataFrame
+            # Создаём DataFrame с операциями
             df = pd.DataFrame(data)
             df = df.sort_values("Дата", ascending=False)
 
-            # Добавляем итоговую строку
-            balance = total_income - total_expense
-            total_row = {
-                "Дата": "ИТОГО:",
-                "Тип": "",
-                "Сумма (руб.)": "",
-                "Описание": ""
-            }
-            df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
+            # === ИЗМЕНЕНИЕ: ИТОГИ В СТОЛБЕЦ (отдельные строки) ===
+            # Добавляем пустую строку для разделения
+            separator = pd.DataFrame([{"Дата": "", "Тип": "", "Сумма (руб.)": "", "Описание": ""}])
 
-            # Форматируем итоговую строку отдельно
-            df.loc[df.index[-1], "Тип"] = f"Доходы: {total_income:,.2f} руб."
-            df.loc[df.index[-1], "Сумма (руб.)"] = f"Расходы: {total_expense:,.2f} руб."
-            df.loc[df.index[-1], "Описание"] = f"Баланс: {balance:,.2f} руб."
+            # Итоговые строки
+            summary = pd.DataFrame([
+                {"Дата": "Доходы", "Тип": "", "Сумма (руб.)": total_income, "Описание": "руб."},
+                {"Дата": "Расходы", "Тип": "", "Сумма (руб.)": total_expense, "Описание": "руб."},
+                {"Дата": "Баланс", "Тип": "", "Сумма (руб.)": total_income - total_expense, "Описание": "руб."},
+            ])
+
+            # Объединяем: операции + пустая строка + итоги
+            final_df = pd.concat([df, separator, summary], ignore_index=True)
 
             # Сохраняем в Excel
             output = BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                df.to_excel(writer, index=False, sheet_name="Операции")
+                final_df.to_excel(writer, index=False, sheet_name="Операции")
 
                 # Автоширина колонок
                 worksheet = writer.sheets["Операции"]
