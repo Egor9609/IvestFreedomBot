@@ -1,8 +1,6 @@
 # bot/keyboards/finance.py
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
-from bot.keyboards.base import main_menu
-
 # Клавиатура с отменой и пропуском
 description_keyboard = ReplyKeyboardMarkup(
     keyboard=[
