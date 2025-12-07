@@ -3,6 +3,10 @@ from typing import Optional
 from bot.database.repository import UserRepository, TransactionRepository
 from bot.database.session import get_session
 
+from datetime import datetime
+import pytz
+
+MSK = pytz.timezone('Europe/Moscow')
 
 class FinanceService:
     @staticmethod
@@ -47,3 +51,46 @@ class FinanceService:
     @staticmethod
     async def add_expense(*args, **kwargs):
         return await FinanceService.add_transaction(*args, transaction_type="expense", **kwargs)
+
+    @staticmethod
+    async def get_balance_report(telegram_id: int, period: str) -> dict:
+        """Возвращает отчёт: доходы, расходы, баланс, кол-во операций за период."""
+        async for session in get_session():
+            user_repo = UserRepository(session)
+            trans_repo = TransactionRepository(session)
+
+            user = await user_repo.get_user_by_telegram_id(telegram_id)
+            if not user:
+                return {"error": "Пользователь не найден"}
+
+            transactions = await trans_repo.get_transactions_by_user_and_period(user.id, period)
+
+            income = sum(t.amount for t in transactions if t.type == "income")
+            expense = sum(t.amount for t in transactions if t.type == "expense")
+            balance = income - expense
+            count = len(transactions)
+
+            # Формируем заголовок отчёта
+            now = datetime.now(MSK)
+            if period == "day":
+                title_date = now.strftime("%d.%m.%Y")
+            elif period == "week":
+                start = now - timedelta(days=now.weekday())
+                title_date = f"{start.strftime('%d.%m.%Y')} – {now.strftime('%d.%m.%Y')}"
+            elif period == "month":
+                title_date = now.strftime("%B %Y")
+            elif period == "year":
+                title_date = str(now.year)
+            else:
+                title_date = "период"
+
+            return {
+                "success": True,
+                "title": title_date,
+                "income": income,
+                "expense": expense,
+                "balance": balance,
+                "count": count
+            }
+
+

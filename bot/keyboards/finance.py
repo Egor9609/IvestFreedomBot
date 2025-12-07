@@ -23,3 +23,14 @@ cancel_keyboard = ReplyKeyboardMarkup(
 
 expense_cancel_keyboard = cancel_keyboard
 expense_description_keyboard = description_keyboard
+
+report_period_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="📅 Сегодня")],
+        [KeyboardButton(text="📅 Неделя"), KeyboardButton(text="📅 Месяц")],
+        [KeyboardButton(text="📅 Год")],
+        [KeyboardButton(text="🔙 Назад")]
+    ],
+    resize_keyboard=True,
+    one_time_keyboard=False
+)
