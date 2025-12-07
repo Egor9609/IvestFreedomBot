@@ -23,7 +23,7 @@ router = Router()
 @router.message(F.text == "➕ Добавить долг")
 async def start_add_debt(message: Message, state: FSMContext):
     await state.set_state(DebtStates.waiting_for_description)
-    await message.answer("Введите название долга (например: Ипотека):", reply_markup=debts_cancel)
+    await message.answer("🏦 Введите название долга (например: 'Кредит в Тинькофф'):", reply_markup=debts_cancel)
 
 @router.message(DebtStates.waiting_for_description)
 async def debt_description(message: Message, state: FSMContext):
@@ -32,7 +32,7 @@ async def debt_description(message: Message, state: FSMContext):
         return
     await state.update_data(description=message.text)
     await state.set_state(DebtStates.waiting_for_amount)
-    await message.answer("Введите сумму долга (в рублях):", reply_markup=debts_cancel)
+    await message.answer("💰 Введите общую сумму долга:", reply_markup=debts_cancel)
 
 # ---- Сумма ----
 @router.message(DebtStates.waiting_for_amount)
@@ -46,11 +46,11 @@ async def debt_amount(message: Message, state: FSMContext):
             await message.answer("Сумма должна быть больше нуля.")
             return
     except ValueError:
-        await message.answer("Пожалуйста, введите корректную сумму.")
+        await message.answer("Пожалуйста, введите корректную сумму (например: 1500.50):")
         return
     await state.update_data(amount=amount)
     await state.set_state(DebtStates.waiting_for_due_date)
-    await message.answer("Выберите дату погашения:", reply_markup=due_date_keyboard)
+    await message.answer("📅 Введите дату погашения долга (в формате ДД.ММ.ГГГГ), или выберите один из вариантов:", reply_markup=due_date_keyboard)
 
 # ---- Дата погашения ----
 @router.message(DebtStates.waiting_for_due_date)
@@ -61,6 +61,7 @@ async def debt_due_date(message: Message, state: FSMContext):
 
     now = datetime.now().date()
 
+    # Попробуем сначала распознать как один из предустановленных вариантов
     if message.text == "📅 Через неделю":
         due_date = now + timedelta(weeks=1)
     elif message.text == "📅 Через месяц":
@@ -69,14 +70,15 @@ async def debt_due_date(message: Message, state: FSMContext):
         due_date = now + timedelta(days=90)
     elif message.text == "📅 Через полгода":
         due_date = now + timedelta(days=180)
-    elif message.text == "✏️ Ввести вручную":
-        await message.answer("Введите дату в формате ДД.ММ.ГГГГ (например: 14.12.2025):")
-        return
     else:
-        # Пытаемся распознать вручную введённую дату
+        # Иначе считаем, что пользователь вводит дату вручную
         match = re.match(r"(\d{2})\.(\d{2})\.(\d{4})", message.text.strip())
         if not match:
-            await message.answer("Неверный формат даты. Введите ДД.ММ.ГГГГ или выберите вариант ниже:", reply_markup=due_date_keyboard)
+            await message.answer(
+                "📅 Введите дату погашения долга (в формате ДД.ММ.ГГГГ),\n"
+                "или выберите один из вариантов:",
+                reply_markup=due_date_keyboard
+            )
             return
         try:
             day, month, year = map(int, match.groups())
@@ -85,7 +87,10 @@ async def debt_due_date(message: Message, state: FSMContext):
                 await message.answer("Дата погашения должна быть в будущем. Попробуйте снова:")
                 return
         except ValueError:
-            await message.answer("Некорректная дата. Попробуйте снова:")
+            await message.answer(
+                "Некорректная дата. Введите в формате ДД.ММ.ГГГГ или выберите вариант:",
+                reply_markup=due_date_keyboard
+            )
             return
 
     await state.update_data(due_date=due_date)
@@ -149,9 +154,11 @@ async def _save_debt(message: Message, state: FSMContext, note: str = None):
             f"💰 Сумма: {debt.total_amount:,.2f} руб.\n"
             f"📅 Дата погашения: {debt.due_date.strftime('%d.%m.%Y')}\n"
             f"🏷️ Категория: {debt.category}\n"
-            f"📊 Остаток: {debt.remaining_amount:,.2f} руб.\n\n"
-            f"ID записи: {debt.id}"
         )
+        if debt.note:
+            response += f"📝 Примечание: {debt.note}\n"
+        response += f"📊 Остаток: {debt.remaining_amount:,.2f} руб.\n\n"
+        response += f"ID записи: {debt.id}"
         await message.answer(response, reply_markup=debts_menu)
     else:
         logger.error(f"Ошибка при добавлении долга: {result['error']}")
