@@ -1,6 +1,6 @@
 # bot/database/models.py
 from datetime import datetime
-from sqlalchemy import Integer, String, DateTime, Numeric, Boolean, ForeignKey
+from sqlalchemy import Integer, String, DateTime, Numeric, Boolean, ForeignKey, Date
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -46,5 +46,8 @@ class Debt(Base):
     description: Mapped[str] = mapped_column(String, nullable=False)  # Например: "Ипотека"
     total_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)  # Полная сумма долга
     remaining_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)  # Остаток
+    due_date: Mapped[datetime] = mapped_column(Date, nullable=False)  # только дата
+    category: Mapped[str] = mapped_column(String, nullable=False)  # "Кредит", "Другое" и т.д.
+    note: Mapped[str] = mapped_column(String, nullable=True)  # для "Другое"
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(MSK))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)  # Активен ли долг (не погашен полностью)

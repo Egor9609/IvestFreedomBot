@@ -124,12 +124,23 @@ class DebtRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def add_debt(self, user_id: int, description: str, total_amount: float):
+    async def add_debt(
+            self,
+            user_id: int,
+            description: str,
+            total_amount: float,
+            due_date: datetime,
+            category: str,
+            note: str = None
+    ):
         debt = Debt(
             user_id=user_id,
             description=description,
             total_amount=total_amount,
-            remaining_amount=total_amount
+            remaining_amount=total_amount,
+            due_date=due_date,
+            category=category,
+            note=note
         )
         self.session.add(debt)
         await self.session.commit()

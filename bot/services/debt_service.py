@@ -2,10 +2,18 @@
 
 from database.repository import UserRepository, DebtRepository
 from database.session import get_session
+from datetime import datetime
 
 class DebtService:
     @staticmethod
-    async def add_debt(telegram_id: int, description: str, total_amount: float):
+    async def add_debt(
+            telegram_id: int,
+            description: str,
+            total_amount: float,
+            due_date: datetime,
+            category: str,
+            note: str = None
+    ):
         async for session in get_session():
             user_repo = UserRepository(session)
             debt_repo = DebtRepository(session)
@@ -17,9 +25,12 @@ class DebtService:
             debt = await debt_repo.add_debt(
                 user_id=user.id,
                 description=description,
-                total_amount=total_amount
+                total_amount=total_amount,
+                due_date=due_date,
+                category=category,
+                note=note
             )
-            return {"success": True, "debt_id": debt.id}
+            return {"success": True, "debt": debt}
 
     @staticmethod
     async def get_active_debts(telegram_id: int):
