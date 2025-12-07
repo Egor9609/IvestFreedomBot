@@ -1,7 +1,7 @@
 # bot/database/repository.py
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from bot.database.models import User, Transaction
+from bot.database.models import User, Transaction, Debt
 from datetime import datetime, timedelta
 import pytz
 
@@ -119,3 +119,29 @@ class TransactionRepository:
         )
         result = await self.session.execute(stmt)
         return result.scalars().all()
+
+class DebtRepository:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def add_debt(self, user_id: int, description: str, total_amount: float):
+        debt = Debt(
+            user_id=user_id,
+            description=description,
+            total_amount=total_amount,
+            remaining_amount=total_amount
+        )
+        self.session.add(debt)
+        await self.session.commit()
+        await self.session.refresh(debt)
+        return debt
+
+    async def get_active_debts_by_user(self, user_id: int):
+        stmt = select(Debt).where(Debt.user_id == user_id, Debt.is_active == True)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def get_debt_by_id(self, debt_id: int):
+        stmt = select(Debt).where(Debt.id == debt_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()

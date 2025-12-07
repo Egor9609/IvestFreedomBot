@@ -2,9 +2,11 @@
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
+from aiogram import F
 from bot.keyboards.base import main_menu
 from bot.database.repository import UserRepository
 from bot.database.session import get_session
+from bot.keyboards.debts import debts_menu
 
 router = Router()
 
@@ -23,3 +25,7 @@ async def cmd_start(message: Message):
         "Привет! Я FinBot — твой финансовый помощник. Выбери действие:",
         reply_markup=main_menu
     )
+
+@router.message(F.text == "💳 Долги")
+async def btn_debts(message: Message):
+    await message.answer("💳 Управление долгами:", reply_markup=debts_menu)

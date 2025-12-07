@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 import pytz
 
 # Определяем московский часовой пояс
-MSK_TZ = pytz.timezone('Europe/Moscow')
+MSK = pytz.timezone('Europe/Moscow')
 
 class Base(AsyncAttrs, DeclarativeBase):
     pass
@@ -21,7 +21,7 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: datetime.now(MSK_TZ)
+        default=lambda: datetime.now(MSK)
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
@@ -35,5 +35,16 @@ class Transaction(Base):
     description: Mapped[str] = mapped_column(String, nullable=True)
     date: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: datetime.now(MSK_TZ)
+        default=lambda: datetime.now(MSK)
     )
+
+class Debt(Base):
+    __tablename__ = "debts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=False)  # Например: "Ипотека"
+    total_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)  # Полная сумма долга
+    remaining_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)  # Остаток
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(MSK))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)  # Активен ли долг (не погашен полностью)
