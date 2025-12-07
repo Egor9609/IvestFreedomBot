@@ -6,6 +6,7 @@ from bot.keyboards.debts import debts_menu
 from bot.keyboards.base import main_menu
 from services.debt_service import DebtService
 from datetime import datetime, date
+from bot.keyboards.debts import debts_menu as debts_menu  # или debts_main_menu
 
 router = Router()
 
