@@ -1,6 +1,6 @@
 # bot/handlers/finance/reports.py
 from aiogram import Router, F
-from aiogram.types import Message
+from aiogram.types import Message, BufferedInputFile
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 
@@ -8,7 +8,6 @@ from bot.keyboards.finance import report_period_keyboard, report_detail_keyboard
 from bot.keyboards.base import main_menu
 from services.finance_service import FinanceService
 from services.export_service import ExportService
-from aiogram.types import BufferedInputFile
 from bot.logger import logger
 
 router = Router()
@@ -75,29 +74,23 @@ async def export_report_excel(message: Message, state: FSMContext):
         await state.clear()
         return
 
-    excel_file = await ExportService.export_transactions_to_excel(
+    # Генерируем Excel
+    result = await ExportService.export_transactions_to_excel(
         telegram_id=message.from_user.id,
         period=period
     )
 
-    if excel_file is None:
+    if result is None:
         await message.answer("Нет данных для экспорта за этот период.", reply_markup=main_menu)
     else:
-        # Получаем байты из BytesIO
+        excel_file, filename = result
         excel_bytes = excel_file.getvalue()
 
-        # Создаём BufferedInputFile
-        document = BufferedInputFile(
-            file=excel_bytes,
-            filename="export.xlsx"
-        )
-
-        await message.answer_document(
-            document=document,
-            caption="📄 Ваш отчёт в формате Excel."
-        )
+        document = BufferedInputFile(file=excel_bytes, filename=filename)
+        await message.answer_document(document=document, caption="📄 Ваш финансовый отчёт.")
         await message.answer("Главное меню:", reply_markup=main_menu)
 
+    await state.clear()
 
 @router.message(ReportStates.viewing_report, F.text == "🔙 Назад")
 async def back_from_report_detail(message: Message, state: FSMContext):
