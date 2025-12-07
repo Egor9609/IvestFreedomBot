@@ -34,3 +34,12 @@ report_period_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True,
     one_time_keyboard=False
 )
+
+report_detail_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="📤 Экспорт в Excel")],
+        [KeyboardButton(text="🔙 Назад")]
+    ],
+    resize_keyboard=True,
+    one_time_keyboard=False
+)
