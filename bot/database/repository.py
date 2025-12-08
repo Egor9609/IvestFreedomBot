@@ -1,7 +1,7 @@
 # bot/database/repository.py
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from bot.database.models import User, Transaction, Debt
+from bot.database.models import User, Transaction, Debt, Bill
 from datetime import datetime, timedelta, date
 import pytz
 from decimal import Decimal
@@ -238,3 +238,54 @@ class DebtRepository:
             "by_category": dict(by_category),
             "nearest": nearest
         }
+
+class BillRepository:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def add_bill(self, user_id: int, description: str, amount: float, due_date: datetime, debt_id: int = None):
+        bill = Bill(
+            user_id=user_id,
+            description=description,
+            amount=amount,
+            due_date=due_date,
+            debt_id=debt_id
+        )
+        self.session.add(bill)
+        await self.session.commit()
+        await self.session.refresh(bill)
+        return bill
+
+    async def get_active_bills_by_user(self, user_id: int):
+        stmt = select(Bill).where(Bill.user_id == user_id, Bill.is_paid == False)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def pay_bill(self, bill_id: int):
+        bill = await self.get_bill_by_id(bill_id)
+        if not bill or bill.is_paid:
+            return None
+
+        bill.is_paid = True
+        bill.paid_at = datetime.now(MSK)
+
+        # Если счёт привязан к долгу — уменьшаем остаток
+        if bill.debt_id:
+            debt_repo = DebtRepository(self.session)
+            debt = await debt_repo.get_debt_by_id(bill.debt_id)
+            if debt:
+                new_remaining = debt.remaining_amount - bill.amount
+                if new_remaining < 0:
+                    new_remaining = 0
+                debt.remaining_amount = new_remaining
+                if new_remaining <= 0:
+                    debt.is_active = False
+
+        await self.session.commit()
+        await self.session.refresh(bill)
+        return bill
+
+    async def get_bill_by_id(self, bill_id: int):
+        stmt = select(Bill).where(Bill.id == bill_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()

@@ -29,3 +29,8 @@ async def cmd_start(message: Message):
 @router.message(F.text == "💳 Долги")
 async def btn_debts(message: Message):
     await message.answer("💳 Управление долгами:", reply_markup=debts_menu)
+
+@router.message(F.text == "🧾 Счета")
+async def btn_bills(message: Message):
+    from bot.keyboards.bills import bills_menu
+    await message.answer("🧾 Управление счетами:", reply_markup=bills_menu)

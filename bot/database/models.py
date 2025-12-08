@@ -51,3 +51,16 @@ class Debt(Base):
     note: Mapped[str] = mapped_column(String, nullable=True)  # для "Другое"
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(MSK))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)  # Активен ли долг (не погашен полностью)
+
+class Bill(Base):
+    __tablename__ = "bills"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=False)  # Например: "Ипотека за декабрь"
+    amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    due_date: Mapped[datetime] = mapped_column(Date, nullable=False)
+    is_paid: Mapped[bool] = mapped_column(Boolean, default=False)
+    paid_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    debt_id: Mapped[int] = mapped_column(Integer, ForeignKey("debts.id"), nullable=True)  # ← привязка к долгу
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(MSK))
