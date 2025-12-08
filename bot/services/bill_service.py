@@ -13,7 +13,7 @@ class BillService:
             if not user:
                 return {"success": False, "error": "Пользователь не найден"}
 
-            # Проверяем, существует ли долг (если указан)
+            # Проверяем долг
             if debt_id:
                 debt_repo = DebtRepository(session)
                 debt = await debt_repo.get_debt_by_id(debt_id)
@@ -21,7 +21,15 @@ class BillService:
                     return {"success": False, "error": "Долг не найден или не принадлежит вам"}
 
             bill_repo = BillRepository(session)
-            bill = await bill_repo.add_bill(user.id, description, amount, due_date, debt_id)
+            # Передаём telegram_id напрямую, НЕ через user
+            bill = await bill_repo.add_bill(
+                user_id=user.id,
+                telegram_id=telegram_id,  # ← явно передаём
+                description=description,
+                amount=amount,
+                due_date=due_date,
+                debt_id=debt_id
+            )
             return {"success": True, "bill_id": bill.id}
 
     @staticmethod

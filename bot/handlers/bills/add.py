@@ -45,7 +45,8 @@ async def bill_amount(message: Message, state: FSMContext):
         return
     await state.update_data(amount=amount)
     await state.set_state(BillStates.waiting_for_due_date)
-    await message.answer("Введите дату оплаты (ДД.ММ.ГГГГ):", reply_markup=bills_cancel)
+    await message.answer("📅 Введите дату оплаты счёта (в формате ДД.ММ.ГГГГ),\n"
+                "или выберите один из вариантов::", reply_markup=due_date_keyboard)
 
 # --- Дата ---
 @router.message(BillStates.waiting_for_due_date)
@@ -89,7 +90,7 @@ async def bill_due_date(message: Message, state: FSMContext):
     await message.answer("Хотите привязать счёт к долгу?", reply_markup=link_debt_keyboard)
 
 # --- Привязка к долгу ---
-router.message(BillStates.waiting_for_debt_link)
+@router.message(BillStates.waiting_for_debt_link)
 async def bill_debt_link_choice(message: Message, state: FSMContext):
     if message.text == "❌ Отмена":
         await _cancel(message, state)
@@ -99,30 +100,32 @@ async def bill_debt_link_choice(message: Message, state: FSMContext):
         await _save_bill(message, state, debt_id=None)
         return
 
-    # Иначе: пользователь выбрал долг из кнопок
-    data = await state.get_data()
-    if "debt_map" not in data:
-        # Первая загрузка — покажем кнопки
+    if message.text == "🔗 Привязать к долгу":
+        # Показываем список долгов как кнопки
         debts = await DebtService.get_active_debts(message.from_user.id)
         if not debts:
-            await message.answer("Нет активных долгов.", reply_markup=bills_menu)
+            await message.answer("Нет активных долгов для привязки.", reply_markup=bills_menu)
             await state.clear()
             return
+
         debt_map = {
             f"🔗 {d.id}. {d.description} ({d.remaining_amount:,.2f} руб.)": d.id
             for d in debts
         }
-        await state.update_data(debt_map=debt_map)
         keyboard = build_debt_selection_keyboard_for_bills(debts)
+        await state.update_data(debt_map=debt_map)
         await message.answer("Выберите долг для привязки:", reply_markup=keyboard)
         return
 
-    # Повторный вызов — обработка выбора
-    debt_id = data["debt_map"].get(message.text)
+    # Если пришёл текст, похожий на долг — обрабатываем его
+    data = await state.get_data()
+    debt_map = data.get("debt_map", {})
+    debt_id = debt_map.get(message.text)
+
     if debt_id:
         await _save_bill(message, state, debt_id=debt_id)
     else:
-        await message.answer("Выберите долг из списка.")
+        await message.answer("Пожалуйста, используйте кнопки для выбора.")
 
 # --- Сохранение ---
 async def _save_bill(message: Message, state: FSMContext, debt_id: int = None):

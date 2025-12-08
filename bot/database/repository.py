@@ -243,10 +243,18 @@ class BillRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def add_bill(self, user_id: int, description: str, amount: float, due_date: datetime, debt_id: int = None):
+    async def add_bill(
+            self,
+            user_id: int,
+            telegram_id: int,  # ← добавлено
+            description: str,
+            amount: float,
+            due_date: datetime,
+            debt_id: int = None
+    ):
         bill = Bill(
             user_id=user_id,
-            telegram_id=user.telegram_id,
+            telegram_id=telegram_id,  # ← теперь есть
             description=description,
             amount=amount,
             due_date=due_date,

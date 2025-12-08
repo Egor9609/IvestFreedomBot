@@ -57,6 +57,7 @@ class Bill(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    telegram_id: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[str] = mapped_column(String, nullable=False)  # Например: "Ипотека за декабрь"
     amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     due_date: Mapped[datetime] = mapped_column(Date, nullable=False)
