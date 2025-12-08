@@ -86,7 +86,7 @@ async def bill_due_date(message: Message, state: FSMContext):
 
     await state.update_data(due_date=due_date)
     await state.set_state(BillStates.waiting_for_debt_link)
-    await message.answer("Хотите привязать счёт к долгу?", reply_markup=due_date_keyboard)
+    await message.answer("Хотите привязать счёт к долгу?", reply_markup=link_debt_keyboard)
 
 # --- Привязка к долгу ---
 router.message(BillStates.waiting_for_debt_link)
