@@ -64,3 +64,4 @@ class Bill(Base):
     paid_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     debt_id: Mapped[int] = mapped_column(Integer, ForeignKey("debts.id"), nullable=True)  # ← привязка к долгу
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(MSK))
+    telegram_id: Mapped[int] = mapped_column(Integer, nullable=False)

@@ -3,6 +3,9 @@ import asyncio
 import logging
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from scheduler.jobs import send_bill_reminders
+
 from bot.config import BOT_TOKEN
 from bot.handlers import register_all_routers
 from bot.logger import logger  # подключим, чтобы инициализировать
@@ -15,9 +18,13 @@ async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
 
-    # Создаём таблицы при запуске
-    await create_db_and_tables()
+    # Планировщик
+    scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
+    scheduler.add_job(send_bill_reminders, "cron", hour=9, minute=0, args=[bot])
+    scheduler.start()
 
+        # Создаём таблицы при запуске
+    await create_db_and_tables()
     register_all_routers(dp)
 
     try:

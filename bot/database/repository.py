@@ -246,6 +246,7 @@ class BillRepository:
     async def add_bill(self, user_id: int, description: str, amount: float, due_date: datetime, debt_id: int = None):
         bill = Bill(
             user_id=user_id,
+            telegram_id=user.telegram_id,
             description=description,
             amount=amount,
             due_date=due_date,
@@ -269,17 +270,14 @@ class BillRepository:
         bill.is_paid = True
         bill.paid_at = datetime.now(MSK)
 
-        # Если счёт привязан к долгу — уменьшаем остаток
         if bill.debt_id:
             debt_repo = DebtRepository(self.session)
             debt = await debt_repo.get_debt_by_id(bill.debt_id)
-            if debt:
-                new_remaining = debt.remaining_amount - bill.amount
-                if new_remaining < 0:
-                    new_remaining = 0
-                debt.remaining_amount = new_remaining
-                if new_remaining <= 0:
+            if debt and debt.is_active:
+                debt.remaining_amount -= bill.amount
+                if debt.remaining_amount <= 0:
                     debt.is_active = False
+                    debt.remaining_amount = 0
 
         await self.session.commit()
         await self.session.refresh(bill)

@@ -3,13 +3,13 @@
 from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 
 from bot.states.bill_states import BillStates
-from bot.keyboards.bills import bills_cancel, link_debt_keyboard, bills_menu
-from services.bill_service import BillService
-from services.debt_service import DebtService
+from bot.keyboards.bills import bills_cancel, link_debt_keyboard, bills_menu, due_date_keyboard
+from bot.services.bill_service import BillService
+from bot.services.debt_service import DebtService
 from bot.logger import logger
 
 router = Router()
@@ -54,66 +54,75 @@ async def bill_due_date(message: Message, state: FSMContext):
         await _cancel(message, state)
         return
 
-    match = re.match(r"(\d{2})\.(\d{2})\.(\d{4})", message.text.strip())
-    if not match:
-        await message.answer("Неверный формат. Введите ДД.ММ.ГГГГ:")
-        return
-    try:
-        day, month, year = map(int, match.groups())
-        due_date = datetime(year, month, day).date()
-        if due_date <= datetime.now().date():
-            await message.answer("Дата должна быть в будущем.")
+    now = datetime.now().date()
+
+    if message.text == "📅 Через неделю":
+        due_date = now + timedelta(weeks=1)
+    elif message.text == "📅 Через месяц":
+        due_date = now + timedelta(days=30)
+    elif message.text == "📅 Через 3 месяца":
+        due_date = now + timedelta(days=90)
+    elif message.text == "📅 Через полгода":
+        due_date = now + timedelta(days=180)
+    else:
+        # Ручной ввод
+        match = re.match(r"(\d{2})\.(\d{2})\.(\d{4})", message.text.strip())
+        if not match:
+            await message.answer(
+                "📅 Введите дату оплаты счёта (в формате ДД.ММ.ГГГГ),\n"
+                "или выберите один из вариантов:",
+                reply_markup=due_date_keyboard
+            )
             return
-    except ValueError:
-        await message.answer("Некорректная дата.")
-        return
+        try:
+            day, month, year = map(int, match.groups())
+            due_date = datetime(year, month, day).date()
+            if due_date <= now:
+                await message.answer("Дата должна быть в будущем.")
+                return
+        except ValueError:
+            await message.answer("Некорректная дата. Попробуйте снова.", reply_markup=due_date_keyboard)
+            return
 
     await state.update_data(due_date=due_date)
-
-    # Переходим к выбору привязки
     await state.set_state(BillStates.waiting_for_debt_link)
-    await message.answer("Хотите привязать счёт к долгу?", reply_markup=link_debt_keyboard)
+    await message.answer("Хотите привязать счёт к долгу?", reply_markup=due_date_keyboard)
 
 # --- Привязка к долгу ---
-@router.message(BillStates.waiting_for_debt_link)
+router.message(BillStates.waiting_for_debt_link)
 async def bill_debt_link_choice(message: Message, state: FSMContext):
     if message.text == "❌ Отмена":
         await _cancel(message, state)
         return
 
     if message.text == "🚫 Не привязывать":
-        # Сохраняем без долга
         await _save_bill(message, state, debt_id=None)
         return
 
-    if message.text == "🔗 Привязать к долгу":
-        # Показываем список долгов
+    # Иначе: пользователь выбрал долг из кнопок
+    data = await state.get_data()
+    if "debt_map" not in data:
+        # Первая загрузка — покажем кнопки
         debts = await DebtService.get_active_debts(message.from_user.id)
         if not debts:
-            await message.answer("У вас нет активных долгов для привязки.", reply_markup=bills_menu)
+            await message.answer("Нет активных долгов.", reply_markup=bills_menu)
             await state.clear()
             return
-
-        text = "Выберите долг для привязки:\n\n"
-        debt_options = {}
-        for d in debts:
-            label = f"{d.id}. {d.description} ({d.remaining_amount:,.2f} руб.)"
-            text += label + "\n"
-            debt_options[label] = d.id
-
-        await state.update_data(debt_options=debt_options)
-        await state.set_state(BillStates.waiting_for_debt_link)
-        await message.answer(text, reply_markup=bills_cancel)
+        debt_map = {
+            f"🔗 {d.id}. {d.description} ({d.remaining_amount:,.2f} руб.)": d.id
+            for d in debts
+        }
+        await state.update_data(debt_map=debt_map)
+        keyboard = build_debt_selection_keyboard_for_bills(debts)
+        await message.answer("Выберите долг для привязки:", reply_markup=keyboard)
         return
 
-    # Если пользователь ввёл ID вручную
-    data = await state.get_data()
-    debt_options = data.get("debt_options", {})
-    if message.text in debt_options:
-        debt_id = debt_options[message.text]
+    # Повторный вызов — обработка выбора
+    debt_id = data["debt_map"].get(message.text)
+    if debt_id:
         await _save_bill(message, state, debt_id=debt_id)
     else:
-        await message.answer("Выберите долг из списка или нажмите 'Не привязывать'.")
+        await message.answer("Выберите долг из списка.")
 
 # --- Сохранение ---
 async def _save_bill(message: Message, state: FSMContext, debt_id: int = None):
@@ -136,3 +145,14 @@ async def _save_bill(message: Message, state: FSMContext, debt_id: int = None):
 async def _cancel(message: Message, state: FSMContext):
     await state.clear()
     await message.answer("Добавление счёта отменено.", reply_markup=bills_menu)
+
+#Добавим функцию для кнопок долгов
+def build_debt_selection_keyboard_for_bills(debts):
+    from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+    buttons = []
+    for d in debts:
+        label = f"🔗 {d.id}. {d.description} ({d.remaining_amount:,.2f} руб.)"
+        buttons.append([KeyboardButton(text=label)])
+    buttons.append([KeyboardButton(text="🚫 Не привязывать")])
+    buttons.append([KeyboardButton(text="❌ Отмена")])
+    return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
