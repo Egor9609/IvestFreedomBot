@@ -3,9 +3,12 @@ import pandas as pd
 from io import BytesIO
 from datetime import datetime, timedelta
 import pytz
+from sqlalchemy import select
 
 from bot.database.repository import UserRepository, TransactionRepository, DebtRepository
 from bot.database.session import get_session
+from bot.database.models import Debt
+
 
 MSK = pytz.timezone('Europe/Moscow')
 

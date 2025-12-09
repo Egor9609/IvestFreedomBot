@@ -7,3 +7,4 @@ class BillStates(StatesGroup):
     waiting_for_amount = State()
     waiting_for_due_date = State()
     waiting_for_debt_link = State()  # ← выбор долга для привязки
+    waiting_for_months = State()

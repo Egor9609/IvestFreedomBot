@@ -1,8 +1,9 @@
 # services/bill_service.py
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from bot.database.repository import UserRepository, BillRepository, DebtRepository
 from bot.database.session import get_session
+from bot.database.models import Bill
 
 class BillService:
     @staticmethod
@@ -60,3 +61,40 @@ class BillService:
                 return {"success": True, "bill": paid_bill}
             else:
                 return {"success": False, "error": "Счёт уже оплачен"}
+
+    @staticmethod
+    async def create_recurring_bill_from_debt(telegram_id: int, debt_id: int, months: int):
+        """Автоматически создаёт первый счёт по графику."""
+        async for session in get_session():
+            user_repo = UserRepository(session)
+            debt_repo = DebtRepository(session)
+            bill_repo = BillRepository(session)
+
+            user = await user_repo.get_user_by_telegram_id(telegram_id)
+            debt = await debt_repo.get_debt_by_id(debt_id)
+
+            if not user or not debt or debt.user_id != user.id:
+                return {"success": False, "error": "Долг не найден"}
+
+            if not debt.is_active:
+                return {"success": False, "error": "Долг уже погашен"}
+
+            amount_per_month = debt.remaining_amount / months
+            due_date = max(datetime.now().date() + timedelta(days=30), debt.due_date - timedelta(days=30 * months))
+
+            bill = Bill(
+                user_id=user.id,
+                telegram_id=telegram_id,
+                description=debt.description,
+                amount=round(amount_per_month, 2),
+                due_date=due_date,
+                debt_id=debt_id,
+                is_recurring=True,
+                recurrence_months=1,
+                total_installments=months,
+                current_installment=1
+            )
+            session.add(bill)
+            await session.commit()
+            await session.refresh(bill)
+            return {"success": True, "bill_id": bill.id}

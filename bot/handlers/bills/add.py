@@ -17,8 +17,11 @@ router = Router()
 # --- Описание ---
 @router.message(F.text == "➕ Добавить счёт")
 async def start_add_bill(message: Message, state: FSMContext):
-    await state.set_state(BillStates.waiting_for_description)
-    await message.answer("Введите название счёта (например: Ипотека за декабрь):", reply_markup=bills_cancel)
+    await state.set_state(BillStates.waiting_for_debt_link)
+    await message.answer("Хотите привязать счёт к долгу?", reply_markup=link_debt_keyboard)
+
+# Остальной код: если "Да" — показываем долги → просим ввести кол-во месяцев → вызываем create_recurring_bill_from_debt
+# Если "Нет" — идём по старому сценарию (ввод описания, суммы, даты)
 
 @router.message(BillStates.waiting_for_description)
 async def bill_description(message: Message, state: FSMContext):
@@ -97,11 +100,12 @@ async def bill_debt_link_choice(message: Message, state: FSMContext):
         return
 
     if message.text == "🚫 Не привязывать":
-        await _save_bill(message, state, debt_id=None)
+        # Перейти к обычному сценарию: ввод описания → суммы → даты
+        await state.set_state(BillStates.waiting_for_description)
+        await message.answer("Введите название счёта (например: Ипотека за декабрь):", reply_markup=bills_cancel)
         return
 
     if message.text == "🔗 Привязать к долгу":
-        # Показываем список долгов как кнопки
         debts = await DebtService.get_active_debts(message.from_user.id)
         if not debts:
             await message.answer("Нет активных долгов для привязки.", reply_markup=bills_menu)
@@ -112,20 +116,39 @@ async def bill_debt_link_choice(message: Message, state: FSMContext):
             f"🔗 {d.id}. {d.description} ({d.remaining_amount:,.2f} руб.)": d.id
             for d in debts
         }
-        keyboard = build_debt_selection_keyboard_for_bills(debts)
         await state.update_data(debt_map=debt_map)
+        keyboard = build_debt_selection_keyboard_for_bills(debts)
         await message.answer("Выберите долг для привязки:", reply_markup=keyboard)
         return
 
-    # Если пришёл текст, похожий на долг — обрабатываем его
+    # Обработка выбора конкретного долга
     data = await state.get_data()
     debt_map = data.get("debt_map", {})
     debt_id = debt_map.get(message.text)
 
-    if debt_id:
-        await _save_bill(message, state, debt_id=debt_id)
-    else:
-        await message.answer("Пожалуйста, используйте кнопки для выбора.")
+    if not debt_id:
+        await message.answer("Пожалуйста, используйте кнопки.")
+        return
+
+    # Получаем долг
+    debt = await DebtService.get_debt_by_id(debt_id)
+    if not debt:
+        await message.answer("Ошибка: долг не найден.", reply_markup=bills_menu)
+        await state.clear()
+        return
+
+    # Спрашиваем: на сколько месяцев разбить?
+    await state.update_data(
+        linked_debt_id=debt_id,
+        debt_description=debt.description,
+        debt_remaining=debt.remaining_amount
+    )
+    await state.set_state(BillStates.waiting_for_months)
+    await message.answer(
+        f"Долг: {debt.description}\nОстаток: {debt.remaining_amount:,.2f} руб.\n\n"
+        "На сколько месяцев разбить выплату?",
+        reply_markup=bills_cancel
+    )
 
 # --- Сохранение ---
 async def _save_bill(message: Message, state: FSMContext, debt_id: int = None):
@@ -159,3 +182,45 @@ def build_debt_selection_keyboard_for_bills(debts):
     buttons.append([KeyboardButton(text="🚫 Не привязывать")])
     buttons.append([KeyboardButton(text="❌ Отмена")])
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
+
+@router.message(BillStates.waiting_for_months)
+async def bill_months(message: Message, state: FSMContext):
+    if message.text == "❌ Отмена":
+        await _cancel(message, state)
+        return
+
+    try:
+        months = int(message.text)
+        if months <= 0:
+            await message.answer("Количество месяцев должно быть больше нуля.")
+            return
+    except ValueError:
+        await message.answer("Введите целое число (например: 10).")
+        return
+
+    data = await state.get_data()
+    debt_id = data["linked_debt_id"]
+    debt_description = data["debt_description"]
+    debt_remaining = data["debt_remaining"]
+
+    # Создаём счёт через сервис
+    result = await BillService.create_recurring_bill_from_debt(
+        telegram_id=message.from_user.id,
+        debt_id=debt_id,
+        months=months
+    )
+
+    if result["success"]:
+        await message.answer(
+            f"✅ Автоматический счёт создан!\n\n"
+            f"🧾 {debt_description}\n"
+            f"💵 Ежемесячный платёж: {debt_remaining / months:,.2f} руб.\n"
+            f"📅 Первый платёж: через 1 месяц",
+            reply_markup=bills_menu
+        )
+    else:
+        logger.error(f"Ошибка создания счёта: {result['error']}")
+        await message.answer("Произошла ошибка при создании счёта.", reply_markup=bills_menu)
+
+    await state.clear()
+

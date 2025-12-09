@@ -270,22 +270,52 @@ class BillRepository:
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
-    async def pay_bill(self, bill_id: int):
+    async def pay_bill(self, bill_id: int, user_paid_amount: float = None):
         bill = await self.get_bill_by_id(bill_id)
         if not bill or bill.is_paid:
             return None
 
-        bill.is_paid = True
-        bill.paid_at = datetime.now(MSK)
+        # Если пользователь платит больше — используем его сумму
+        actual_amount = user_paid_amount if user_paid_amount is not None else bill.amount
 
+        # Обновляем долг
         if bill.debt_id:
             debt_repo = DebtRepository(self.session)
             debt = await debt_repo.get_debt_by_id(bill.debt_id)
             if debt and debt.is_active:
-                debt.remaining_amount -= bill.amount
+                debt.remaining_amount -= actual_amount
                 if debt.remaining_amount <= 0:
                     debt.is_active = False
                     debt.remaining_amount = 0
+
+        # Помечаем счёт как оплаченный
+        bill.is_paid = True
+        bill.paid_at = datetime.now(MSK)
+        bill.amount = actual_amount  # фиксируем реальную сумму
+
+        # Если счёт повторяющийся — создаём следующий
+        if bill.is_recurring and bill.debt_id:
+            debt = await debt_repo.get_debt_by_id(bill.debt_id)
+            if debt and debt.is_active:
+                # Пересчитываем сумму следующего платежа
+                remaining_months = (bill.total_installments - bill.current_installment)
+                if remaining_months > 0:
+                    new_amount = debt.remaining_amount / remaining_months
+                    new_due_date = bill.due_date + timedelta(days=30 * bill.recurrence_months)
+
+                    next_bill = Bill(
+                        user_id=bill.user_id,
+                        telegram_id=bill.telegram_id,
+                        description=bill.description,
+                        amount=round(new_amount, 2),
+                        due_date=new_due_date,
+                        debt_id=bill.debt_id,
+                        is_recurring=True,
+                        recurrence_months=bill.recurrence_months,
+                        total_installments=bill.total_installments,
+                        current_installment=bill.current_installment + 1
+                    )
+                    self.session.add(next_bill)
 
         await self.session.commit()
         await self.session.refresh(bill)
