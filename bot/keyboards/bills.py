@@ -38,9 +38,24 @@ due_date_keyboard = ReplyKeyboardMarkup(
     one_time_keyboard=True
 )
 
-months_selection_keyboard = ReplyKeyboardMarkup(
+schedule_selection_keyboard = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="📅 До конца погашения долга")],
+        [KeyboardButton(text="📅 До конца погашения")],
+        [KeyboardButton(text="⚙️ Настроить график вручную")],
+        [KeyboardButton(text="❌ Отмена")]
+    ],
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
+
+payment_frequency_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="📆 Каждую неделю")],
+        [KeyboardButton(text="📆 Каждые 2 недели")],
+        [KeyboardButton(text="📆 Каждый месяц")],
+        [KeyboardButton(text="📆 Квартал (3 мес)")],
+        [KeyboardButton(text="📆 Полгода")],
+        [KeyboardButton(text="📆 Год")],
         [KeyboardButton(text="❌ Отмена")]
     ],
     resize_keyboard=True,

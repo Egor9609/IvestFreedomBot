@@ -66,6 +66,7 @@ class Bill(Base):
     debt_id: Mapped[int] = mapped_column(Integer, ForeignKey("debts.id"), nullable=True)  # ← привязка к долгу
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(MSK))
     is_recurring: Mapped[bool] = mapped_column(Boolean, default=False)  # повторяющийся платёж
-    recurrence_months: Mapped[int] = mapped_column(Integer, nullable=True)  # периодичность в месяцах
     total_installments: Mapped[int] = mapped_column(Integer, nullable=True)  # всего платежей
     current_installment: Mapped[int] = mapped_column(Integer, default=1)  # текущий платёж
+    recurrence_type: Mapped[str] = mapped_column(String, default="months")  # "weeks" или "months"
+    recurrence_value: Mapped[int] = mapped_column(Integer, default=1)  # 1, 2, 3...

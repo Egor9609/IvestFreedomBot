@@ -1,10 +1,12 @@
 # bot/database/repository.py
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from bot.database.models import User, Transaction, Debt, Bill
 from datetime import datetime, timedelta, date
 import pytz
 from decimal import Decimal
+from dateutil.relativedelta import relativedelta
+
+from bot.database.models import User, Transaction, Debt, Bill
 
 MSK = pytz.timezone('Europe/Moscow')
 
@@ -301,7 +303,13 @@ class BillRepository:
                 remaining_months = (bill.total_installments - bill.current_installment)
                 if remaining_months > 0:
                     new_amount = debt.remaining_amount / remaining_months
-                    new_due_date = bill.due_date + timedelta(days=30 * bill.recurrence_months)
+                    if bill.recurrence_type == "weeks":
+                        new_due_date = bill.due_date + timedelta(weeks=bill.recurrence_value)
+                    elif bill.recurrence_type == "months":
+                        new_due_date = bill.due_date + relativedelta(months=bill.recurrence_value)
+                    else:
+                        # fallback на 1 месяц
+                        new_due_date = bill.due_date + relativedelta(months=1)
 
                     next_bill = Bill(
                         user_id=bill.user_id,
@@ -311,7 +319,6 @@ class BillRepository:
                         due_date=new_due_date,
                         debt_id=bill.debt_id,
                         is_recurring=True,
-                        recurrence_months=bill.recurrence_months,
                         total_installments=bill.total_installments,
                         current_installment=bill.current_installment + 1
                     )
