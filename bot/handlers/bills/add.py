@@ -3,11 +3,12 @@
 from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import re
 
 from bot.states.bill_states import BillStates
 from bot.keyboards.bills import bills_cancel, link_debt_keyboard, bills_menu, due_date_keyboard
+from bot.keyboards.bills import months_selection_keyboard
 from bot.services.bill_service import BillService
 from bot.services.debt_service import DebtService
 from bot.logger import logger
@@ -141,13 +142,14 @@ async def bill_debt_link_choice(message: Message, state: FSMContext):
     await state.update_data(
         linked_debt_id=debt_id,
         debt_description=debt.description,
-        debt_remaining=debt.remaining_amount
+        debt_remaining=debt.remaining_amount,
+        debt_due_date = debt.due_date
     )
     await state.set_state(BillStates.waiting_for_months)
     await message.answer(
         f"Долг: {debt.description}\nОстаток: {debt.remaining_amount:,.2f} руб.\n\n"
         "На сколько месяцев разбить выплату?",
-        reply_markup=bills_cancel
+        reply_markup=months_selection_keyboard
     )
 
 # --- Сохранение ---
@@ -189,21 +191,42 @@ async def bill_months(message: Message, state: FSMContext):
         await _cancel(message, state)
         return
 
-    try:
-        months = int(message.text)
-        if months <= 0:
-            await message.answer("Количество месяцев должно быть больше нуля.")
-            return
-    except ValueError:
-        await message.answer("Введите целое число (например: 10).")
-        return
-
     data = await state.get_data()
     debt_id = data["linked_debt_id"]
     debt_description = data["debt_description"]
     debt_remaining = data["debt_remaining"]
+    debt_due_date = data["debt_due_date"]  # ← нужно сохранить при выборе долга!
 
-    # Создаём счёт через сервис
+    months = None
+
+    if message.text == "📅 До конца погашения долга":
+        # Рассчитываем кол-во полных месяцев до даты погашения
+        today = date.today()
+        due = debt_due_date
+
+        if due <= today:
+            await message.answer("Дата погашения долга уже наступила или сегодня.", reply_markup=bills_menu)
+            await state.clear()
+            return
+
+        # Простой расчёт: разница в днях → месяцы
+        months = max(1, (due - today).days // 30)
+        if months == 0:
+            months = 1
+    else:
+        # Ручной ввод
+        try:
+            months = int(message.text)
+            if months <= 0:
+                raise ValueError
+        except ValueError:
+            await message.answer(
+                "Введите целое число (например: 10) или нажмите кнопку:",
+                reply_markup=months_selection_keyboard
+            )
+            return
+
+    # Создаём счёт
     result = await BillService.create_recurring_bill_from_debt(
         telegram_id=message.from_user.id,
         debt_id=debt_id,
@@ -215,7 +238,8 @@ async def bill_months(message: Message, state: FSMContext):
             f"✅ Автоматический счёт создан!\n\n"
             f"🧾 {debt_description}\n"
             f"💵 Ежемесячный платёж: {debt_remaining / months:,.2f} руб.\n"
-            f"📅 Первый платёж: через 1 месяц",
+            f"📅 Первый платёж: через 1 месяц\n"
+            f"📆 Всего платежей: {months}",
             reply_markup=bills_menu
         )
     else:
