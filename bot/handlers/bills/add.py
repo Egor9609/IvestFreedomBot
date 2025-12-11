@@ -116,7 +116,7 @@ async def bill_debt_link_choice(message: Message, state: FSMContext):
         return
 
     if message.text == "🔗 Привязать к долгу":
-        debts = await DebtService.get_active_debts(message.from_user.id)
+        debts = await DebtService.get_unlinked_active_debts(message.from_user.id)
         if not debts:
             await message.answer("Нет активных долгов для привязки.", reply_markup=bills_menu)
             await state.clear()

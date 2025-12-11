@@ -1,5 +1,5 @@
 # bot/database/repository.py
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta, date
 import pytz
@@ -240,6 +240,31 @@ class DebtRepository:
             "by_category": dict(by_category),
             "nearest": nearest
         }
+
+    async def get_unlinked_active_debts_by_user(self, user_id: int):
+        """
+        Возвращает долги, у которых НЕТ ни одного активного счёта (is_paid=False).
+        """
+        # Подзапрос: найти ID долгов, у которых есть неоплаченные счета
+        linked_debt_ids_subq = (
+            select(Bill.debt_id)
+            .where(and_(Bill.debt_id.isnot(None), Bill.is_paid == False))
+            .distinct()
+            .subquery()
+        )
+
+        stmt = (
+            select(Debt)
+            .where(
+                and_(
+                    Debt.user_id == user_id,
+                    Debt.is_active == True,
+                    Debt.id.notin_(select(linked_debt_ids_subq.c.debt_id))
+                )
+            )
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
 
 class BillRepository:
     def __init__(self, session: AsyncSession):

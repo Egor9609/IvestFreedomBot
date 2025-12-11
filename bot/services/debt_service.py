@@ -92,3 +92,14 @@ class DebtService:
         async for session in get_session():
             debt_repo = DebtRepository(session)
             return await debt_repo.get_debt_by_id(debt_id)
+
+    @staticmethod
+    async def get_unlinked_active_debts(telegram_id: int):
+        async for session in get_session():
+            user_repo = UserRepository(session)
+            debt_repo = DebtRepository(session)
+
+            user = await user_repo.get_user_by_telegram_id(telegram_id)
+            if not user:
+                return []
+            return await debt_repo.get_unlinked_active_debts_by_user(user.id)
