@@ -51,15 +51,17 @@ async def bill_amount(message: Message, state: FSMContext):
     try:
         amount = float(message.text.replace(',', '.'))
         if amount <= 0:
-            await message.answer("Сумма должна быть больше нуля.")
-            return
+            raise ValueError
     except ValueError:
         await message.answer("Введите корректную сумму.")
         return
     await state.update_data(amount=amount)
     await state.set_state(BillStates.waiting_for_due_date)
-    await message.answer("📅 Введите дату оплаты счёта (в формате ДД.ММ.ГГГГ),\n"
-                "или выберите один из вариантов::", reply_markup=due_date_keyboard)
+    await message.answer(
+        "📅 Введите дату оплаты счёта (ДД.ММ.ГГГГ),\n"
+        "или выберите один из вариантов:",
+        reply_markup=due_date_keyboard
+    )
 
 # --- Дата ---
 @router.message(BillStates.waiting_for_due_date)
@@ -69,6 +71,7 @@ async def bill_due_date(message: Message, state: FSMContext):
         return
 
     now = datetime.now().date()
+    due_date = None
 
     if message.text == "📅 Через неделю":
         due_date = now + timedelta(weeks=1)
@@ -79,28 +82,38 @@ async def bill_due_date(message: Message, state: FSMContext):
     elif message.text == "📅 Через полгода":
         due_date = now + timedelta(days=180)
     else:
-        # Ручной ввод
         match = re.match(r"(\d{2})\.(\d{2})\.(\d{4})", message.text.strip())
-        if not match:
+        if match:
+            try:
+                day, month, year = map(int, match.groups())
+                due_date = datetime(year, month, day).date()
+                if due_date <= now:
+                    await message.answer("Дата должна быть в будущем.")
+                    return
+            except ValueError:
+                pass
+        if not due_date:
             await message.answer(
-                "📅 Введите дату оплаты счёта (в формате ДД.ММ.ГГГГ),\n"
-                "или выберите один из вариантов:",
+                "Неверный формат. Введите ДД.ММ.ГГГГ или выберите вариант:",
                 reply_markup=due_date_keyboard
             )
             return
-        try:
-            day, month, year = map(int, match.groups())
-            due_date = datetime(year, month, day).date()
-            if due_date <= now:
-                await message.answer("Дата должна быть в будущем.")
-                return
-        except ValueError:
-            await message.answer("Некорректная дата. Попробуйте снова.", reply_markup=due_date_keyboard)
-            return
 
-    await state.update_data(due_date=due_date)
-    await state.set_state(BillStates.waiting_for_debt_link)
-    await message.answer("Хотите привязать счёт к долгу?", reply_markup=link_debt_keyboard)
+    data = await state.get_data()
+    result = await BillService.add_bill(
+        telegram_id=message.from_user.id,
+        description=data["description"],
+        amount=data["amount"],
+        due_date=due_date,
+        debt_id=None  # ← ВАЖНО: None, т.к. не привязан
+    )
+
+    if result["success"]:
+        await message.answer("✅ Счёт успешно добавлен!", reply_markup=bills_menu)
+    else:
+        logger.error(f"Ошибка: {result['error']}")
+        await message.answer("Произошла ошибка.", reply_markup=bills_menu)
+    await state.clear()
 
 # --- Привязка к долгу ---
 @router.message(BillStates.waiting_for_debt_link)
@@ -286,3 +299,66 @@ async def _handle_bill_result(message: Message, result: dict, description: str, 
     else:
         logger.error(f"Ошибка: {result['error']}")
         await message.answer("Ошибка при создании счёта.", reply_markup=bills_menu)
+
+@router.message(BillStates.waiting_for_debt_link)
+async def handle_debt_link_choice(message: Message, state: FSMContext):
+    if message.text == "❌ Отмена":
+        await _cancel(message, state)
+        return
+
+    if message.text == "🚫 Не привязывать":
+        # Переходим к обычному сценарию: ввод описания
+        await state.set_state(BillStates.waiting_for_description)
+        await message.answer("Введите название счёта (например: Квартплата):", reply_markup=bills_cancel)
+        return
+
+    if message.text == "🔗 Привязать к долгу":
+        # Показываем список долгов (как сейчас)
+        debts = await DebtService.get_active_debts(message.from_user.id)
+        if not debts:
+            await message.answer("Нет активных долгов.", reply_markup=bills_menu)
+            await state.clear()
+            return
+        debt_map = {
+            f"🔗 {d.id}. {d.description} ({d.remaining_amount:,.2f} руб.)": d.id
+            for d in debts
+        }
+        keyboard = build_debt_selection_keyboard_for_bills(debts)
+        await state.update_data(debt_map=debt_map)
+        await state.set_state(BillStates.waiting_for_debt_selection)
+        await message.answer("Выберите долг для привязки:", reply_markup=keyboard)
+        return
+
+    # Если пришёл текст, которого нет в клавиатуре
+    await message.answer("Пожалуйста, используйте кнопки.")
+
+@router.message(BillStates.waiting_for_debt_selection)
+async def handle_debt_selection(message: Message, state: FSMContext):
+    if message.text == "❌ Отмена":
+        await _cancel(message, state)
+        return
+
+    data = await state.get_data()
+    debt_id = data.get("debt_map", {}).get(message.text)
+    if not debt_id:
+        await message.answer("Выберите долг из списка.")
+        return
+
+    debt = await DebtService.get_debt_by_id(debt_id)
+    if not debt:
+        await message.answer("Долг не найден.", reply_markup=bills_menu)
+        await state.clear()
+        return
+
+    await state.update_data(
+        linked_debt_id=debt_id,
+        debt_description=debt.description,
+        debt_remaining=debt.remaining_amount,
+        debt_due_date=debt.due_date
+    )
+    await state.set_state(BillStates.waiting_for_months)
+    await message.answer(
+        f"Долг: {debt.description}\nОстаток: {debt.remaining_amount:,.2f} руб.\n\n"
+        "На сколько месяцев разбить выплату?",
+        reply_markup=months_selection_keyboard
+    )
