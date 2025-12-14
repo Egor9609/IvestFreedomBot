@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import pytz
 from sqlalchemy import select
 
-from bot.database.repository import UserRepository, TransactionRepository, DebtRepository, DebtPaymentRepository
+from bot.database.repository import UserRepository, TransactionRepository, DebtRepository, DebtPaymentRepository, BillRepository
 from bot.database.session import get_session
 from bot.database.models import Debt
 
@@ -97,6 +97,22 @@ class ExportService:
                     })
                 debts_df = pd.DataFrame(debt_data)
 
+            # === Оплаченные счета ===
+            bill_repo = BillRepository(session)
+            paid_bills = await bill_repo.get_paid_bills_by_user(user.id)
+            if paid_bills:
+                bill_data = []
+                for row in paid_bills:
+                    bill = row[0]  # Bill объект
+                    debt_desc = row[1]  # debt_description (может быть None)
+                    bill_data.append({
+                        "Дата оплаты": bill.paid_at.strftime("%d.%m.%Y %H:%M"),
+                        "Счёт": bill.description,
+                        "Сумма оплаты (руб.)": float(bill.amount),
+                        "Связанный долг": debt_desc or "—"
+                    })
+                paid_bills_df = pd.DataFrame(bill_data)
+
             # === Имя файла ===
             now = datetime.now(MSK)
             if period == "day":
@@ -161,6 +177,22 @@ class ExportService:
                 if not payments_df.empty:
                     payments_df.to_excel(writer, index=False, sheet_name="Оплаты по долгам")
                     worksheet = writer.sheets["Оплаты по долгам"]
+                    for column in worksheet.columns:
+                        max_length = 0
+                        column_letter = column[0].column_letter
+                        for cell in column:
+                            try:
+                                if len(str(cell.value)) > max_length:
+                                    max_length = len(str(cell.value))
+                            except:
+                                pass
+                        adjusted_width = min(max_length + 2, 50)
+                        worksheet.column_dimensions[column_letter].width = adjusted_width
+
+                # Лист 3: Оплаты по счетам
+                if not paid_bills_df.empty:
+                    paid_bills_df.to_excel(writer, index=False, sheet_name="Оплаты по счетам")
+                    worksheet = writer.sheets["Оплаты по счетам"]
                     for column in worksheet.columns:
                         max_length = 0
                         column_letter = column[0].column_letter

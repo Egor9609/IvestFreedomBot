@@ -359,6 +359,16 @@ class BillRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_paid_bills_by_user(self, user_id: int):
+        stmt = (
+            select(Bill, Debt.description)
+            .join(Debt, Debt.id == Bill.debt_id, isouter=True)
+            .where(Bill.user_id == user_id, Bill.is_paid == True)
+            .order_by(Bill.paid_at.desc())
+        )
+        result = await self.session.execute(stmt)
+        return result.fetchall()
+
 class DebtPaymentRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
