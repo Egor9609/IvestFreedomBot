@@ -100,6 +100,7 @@ class ExportService:
             # === Оплаченные счета ===
             bill_repo = BillRepository(session)
             paid_bills = await bill_repo.get_paid_bills_by_user(user.id)
+            paid_bills_df = pd.DataFrame()
             if paid_bills:
                 bill_data = []
                 for row in paid_bills:
@@ -205,6 +206,8 @@ class ExportService:
                         adjusted_width = min(max_length + 2, 50)
                         worksheet.column_dimensions[column_letter].width = adjusted_width
 
+            if not paid_bills_df.empty:
+                paid_bills_df.to_excel(writer, index=False, sheet_name="Оплаты по счетам")
             output.seek(0)
             return output, filename
 

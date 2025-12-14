@@ -367,7 +367,7 @@ class BillRepository:
             .order_by(Bill.paid_at.desc())
         )
         result = await self.session.execute(stmt)
-        return result.fetchall()
+        return result.scalars().all()
 
 class DebtPaymentRepository:
     def __init__(self, session: AsyncSession):
