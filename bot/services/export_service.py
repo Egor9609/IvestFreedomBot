@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import pytz
 from sqlalchemy import select
 
-from bot.database.repository import UserRepository, TransactionRepository, DebtRepository
+from bot.database.repository import UserRepository, TransactionRepository, DebtRepository, DebtPaymentRepository
 from bot.database.session import get_session
 from bot.database.models import Debt
 
@@ -57,6 +57,23 @@ class ExportService:
                 final_df = pd.concat([df, separator, summary], ignore_index=True)
             else:
                 final_df = pd.DataFrame(columns=["Дата", "Тип", "Сумма (руб.)", "Описание"])
+
+            # === Сбор оплат по долгам ===
+            debt_payment_repo = DebtPaymentRepository(session)
+            payments = await debt_payment_repo.get_payments_by_user(user.id)
+            payments_df = pd.DataFrame()
+
+            if payments:
+                payment_data = []
+                for p in payments:
+                    payment_data.append({
+                        "Дата": p["paid_at"].strftime("%d.%m.%Y %H:%M"),
+                        "Долг": p["description"],
+                        "Категория": p["category"],
+                        "Сумма оплаты (руб.)": float(p["amount"])
+                    })
+                payments_df = pd.DataFrame(payment_data)
+                payments_df = payments_df.sort_values("Дата", ascending=False)
 
             # === Сбор долгов ===
             debts = await debt_repo.get_active_debts_by_user(user.id)
@@ -128,6 +145,22 @@ class ExportService:
                     worksheet.cell(row=last_row + 1, column=5, value="Уже выплачено:")
                     worksheet.cell(row=last_row + 1, column=6, value=total_paid)
 
+                    for column in worksheet.columns:
+                        max_length = 0
+                        column_letter = column[0].column_letter
+                        for cell in column:
+                            try:
+                                if len(str(cell.value)) > max_length:
+                                    max_length = len(str(cell.value))
+                            except:
+                                pass
+                        adjusted_width = min(max_length + 2, 50)
+                        worksheet.column_dimensions[column_letter].width = adjusted_width
+
+                # Лист: Оплаты по долгам
+                if not payments_df.empty:
+                    payments_df.to_excel(writer, index=False, sheet_name="Оплаты по долгам")
+                    worksheet = writer.sheets["Оплаты по долгам"]
                     for column in worksheet.columns:
                         max_length = 0
                         column_letter = column[0].column_letter

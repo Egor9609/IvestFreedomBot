@@ -6,7 +6,7 @@ import pytz
 from decimal import Decimal
 from dateutil.relativedelta import relativedelta
 
-from bot.database.models import User, Transaction, Debt, Bill
+from bot.database.models import User, Transaction, Debt, Bill, DebtPayment
 
 MSK = pytz.timezone('Europe/Moscow')
 
@@ -173,11 +173,16 @@ class DebtRepository:
         if payment_amount > debt.remaining_amount:
             payment_amount = debt.remaining_amount
 
+        # Уменьшаем остаток
         debt.remaining_amount -= payment_amount
 
         if debt.remaining_amount <= Decimal("0"):
             debt.is_active = False
             debt.remaining_amount = Decimal("0")
+
+        # Сохраняем платёж
+        payment = DebtPayment(debt_id=debt_id, amount=amount)
+        self.session.add(payment)
 
         await self.session.commit()
         await self.session.refresh(debt)
@@ -353,3 +358,24 @@ class BillRepository:
         stmt = select(Bill).where(Bill.id == bill_id)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
+
+class DebtPaymentRepository:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def get_payments_by_user(self, user_id: int):
+        stmt = (
+            select(
+                DebtPayment.paid_at,
+                DebtPayment.amount,
+                Debt.description,
+                Debt.category
+            )
+            .select_from(DebtPayment)
+            .join(Debt, Debt.id == DebtPayment.debt_id)
+            .join(User, User.id == Debt.user_id)
+            .where(User.id == user_id)
+            .order_by(DebtPayment.paid_at.desc())
+        )
+        result = await self.session.execute(stmt)
+        return result.mappings().fetchall()  # ← возвращает list[RowMapping]

@@ -70,3 +70,12 @@ class Bill(Base):
     current_installment: Mapped[int] = mapped_column(Integer, default=1)  # текущий платёж
     recurrence_type: Mapped[str] = mapped_column(String, default="months")  # "weeks" или "months"
     recurrence_value: Mapped[int] = mapped_column(Integer, default=1)  # 1, 2, 3...
+
+# модель создания страницы при выгрузке в ексель с историей оплат
+class DebtPayment(Base):
+    __tablename__ = "debt_payments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    debt_id: Mapped[int] = mapped_column(Integer, ForeignKey("debts.id"))
+    amount: Mapped[float] = mapped_column(Numeric(10, 2))
+    paid_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(MSK))
