@@ -8,7 +8,7 @@ import re
 from datetime import datetime
 
 from bot.keyboards.debts import debts_cancel
-from services.debt_service import DebtService
+from bot.services.debt_service import DebtService
 from bot.logger import logger
 from bot.keyboards.debts import debts_menu
 

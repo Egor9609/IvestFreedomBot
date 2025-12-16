@@ -8,6 +8,7 @@ from datetime import date
 from bot.states.debt_states import DebtListStates, DebtDetailStates
 from bot.services.debt_service import DebtService
 from bot.keyboards.debts import debts_menu
+from bot.handlers.debts.list import show_debts_list
 
 router = Router()
 
@@ -66,3 +67,39 @@ async def show_debt_detail(message: Message, state: FSMContext):
     await state.update_data(current_debt_id=debt_id)
     await state.set_state(DebtDetailStates.viewing_detail)
     await message.answer(response, reply_markup=get_debt_detail_keyboard())
+
+# === Закрыть долг ===
+@router.message(F.text == "✅ Закрыть долг")
+async def close_debt(message: Message, state: FSMContext):
+    data = await state.get_data()
+    debt_id = data.get("current_debt_id")
+    if not debt_id:
+        await message.answer("Ошибка: долг не выбран.")
+        return
+
+    result = await DebtService.close_debt(debt_id)
+    if result["success"]:
+        await message.answer("✅ Долг закрыт!", reply_markup=debts_menu)
+    else:
+        await message.answer(f"⚠️ {result['error']}", reply_markup=debts_menu)
+    await state.clear()
+
+# === Удалить долг ===
+@router.message(F.text == "❌ Удалить")
+async def delete_debt(message: Message, state: FSMContext):
+    data = await state.get_data()
+    debt_id = data.get("current_debt_id")
+    if not debt_id:
+        await message.answer("Ошибка: долг не выбран.")
+        return
+
+    result = await DebtService.delete_debt(debt_id)
+    if result["success"]:
+        await message.answer("🗑️ Долг удалён!", reply_markup=debts_menu)
+    else:
+        await message.answer(f"⚠️ {result['error']}", reply_markup=debts_menu)
+    await state.clear()
+
+@router.message(F.text == "📋 Назад к списку")
+async def back_to_debt_list(message: Message, state: FSMContext):
+    await show_debts_list(message, state)  # вызываем функцию из list.py

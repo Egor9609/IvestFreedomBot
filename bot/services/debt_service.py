@@ -1,6 +1,6 @@
 # services/debt_service.py
 
-from bot.database.repository import UserRepository, DebtRepository
+from bot.database.repository import UserRepository, DebtRepository, DebtPaymentRepository
 from bot.database.session import get_session
 from datetime import datetime
 
@@ -124,5 +124,38 @@ class DebtService:
             if total_amount < debt.remaining_amount:
                 debt.remaining_amount = total_amount
 
+            await session.commit()
+            return {"success": True}
+
+    @staticmethod
+    async def close_debt(debt_id: int):
+        """Помечает долг как закрытый (остаток = 0)."""
+        async for session in get_session():
+            debt_repo = DebtRepository(session)
+            debt = await debt_repo.get_debt_by_id(debt_id)
+            if not debt or not debt.is_active:
+                return {"success": False, "error": "Долг не найден или уже закрыт"}
+
+            debt.remaining_amount = 0
+            debt.is_active = False
+            await session.commit()
+            return {"success": True}
+
+    @staticmethod
+    async def delete_debt(debt_id: int):
+        """Удаляет долг, только если по нему не было платежей."""
+        async for session in get_session():
+            # Проверяем, были ли платежи
+            payment_repo = DebtPaymentRepository(session)
+            payments = await payment_repo.get_payments_by_debt(debt_id)
+            if payments:
+                return {"success": False, "error": "Нельзя удалить долг, по которому уже были платежи"}
+
+            debt_repo = DebtRepository(session)
+            debt = await debt_repo.get_debt_by_id(debt_id)
+            if not debt:
+                return {"success": False, "error": "Долг не найден"}
+
+            await session.delete(debt)
             await session.commit()
             return {"success": True}

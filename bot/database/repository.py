@@ -389,3 +389,8 @@ class DebtPaymentRepository:
         )
         result = await self.session.execute(stmt)
         return result.mappings().fetchall()  # ← возвращает list[RowMapping]
+
+    async def get_payments_by_debt(self, debt_id: int):
+        stmt = select(DebtPayment).where(DebtPayment.debt_id == debt_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
