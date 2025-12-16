@@ -1,7 +1,7 @@
 # bot/handlers/debts/edit.py
 
 from aiogram import Router, F
-from aiogram.types import Message
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 import re
@@ -11,7 +11,12 @@ from bot.keyboards.debts import debts_cancel
 from bot.services.debt_service import DebtService
 from bot.logger import logger
 from bot.keyboards.debts import debts_menu
-
+from bot.keyboards.debts import (
+    debts_cancel,
+    due_date_keyboard,
+    category_keyboard,
+    debts_menu
+)
 router = Router()
 
 class DebtEditStates(StatesGroup):
@@ -175,12 +180,11 @@ async def _cancel_edit(message: Message, state: FSMContext):
     await message.answer("Редактирование отменено.", reply_markup=debts_menu)
 
 def _get_category_keyboard():
-    from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-    return ReplyKeyboardMarkup(
+        return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🏦 Кредит"), KeyboardButton(text="👤 Долг другу")],
-            [KeyboardButton(text="🛒 Рассрочка"), KeyboardButton(text="🏠 Ипотека")],
-            [KeyboardButton(text="📱 Техника"), KeyboardButton(text="📝 Другое")],
+            [KeyboardButton(text="Кредит"), KeyboardButton(text="Долг другу")],
+            [KeyboardButton(text="Рассрочка"), KeyboardButton(text="Ипотека")],
+            [KeyboardButton(text="Техника"), KeyboardButton(text="Другое")],
             [KeyboardButton(text="❌ Отмена")]
         ],
         resize_keyboard=True,
