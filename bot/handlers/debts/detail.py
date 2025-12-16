@@ -16,7 +16,6 @@ router = Router()
 def get_debt_detail_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="💵 Внести платёж")],
             [KeyboardButton(text="✏️ Редактировать"), KeyboardButton(text="✅ Закрыть долг")],
             [KeyboardButton(text="❌ Удалить"), KeyboardButton(text="📋 Назад к списку")]
         ],

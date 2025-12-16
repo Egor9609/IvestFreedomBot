@@ -178,9 +178,9 @@ def _get_category_keyboard():
     from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Кредит"), KeyboardButton(text="Долг другу")],
-            [KeyboardButton(text="Рассрочка"), KeyboardButton(text="Ипотека")],
-            [KeyboardButton(text="Техника"), KeyboardButton(text="Другое")],
+            [KeyboardButton(text="🏦 Кредит"), KeyboardButton(text="👤 Долг другу")],
+            [KeyboardButton(text="🛒 Рассрочка"), KeyboardButton(text="🏠 Ипотека")],
+            [KeyboardButton(text="📱 Техника"), KeyboardButton(text="📝 Другое")],
             [KeyboardButton(text="❌ Отмена")]
         ],
         resize_keyboard=True,
