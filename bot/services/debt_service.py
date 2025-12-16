@@ -103,3 +103,26 @@ class DebtService:
             if not user:
                 return []
             return await debt_repo.get_unlinked_active_debts_by_user(user.id)
+
+    @staticmethod
+    async def update_debt(debt_id: int, description: str, total_amount: float, due_date, category: str,
+                          note: str = None):
+        async for session in get_session():
+            debt_repo = DebtRepository(session)
+            debt = await debt_repo.get_debt_by_id(debt_id)
+            if not debt:
+                return {"success": False, "error": "Долг не найден"}
+
+            # Обновляем поля
+            debt.description = description
+            debt.total_amount = total_amount
+            debt.due_date = due_date
+            debt.category = category
+            debt.note = note
+
+            # Если новая сумма < старого остатка — корректируем остаток
+            if total_amount < debt.remaining_amount:
+                debt.remaining_amount = total_amount
+
+            await session.commit()
+            return {"success": True}
