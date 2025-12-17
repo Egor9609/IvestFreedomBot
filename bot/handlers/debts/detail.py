@@ -25,6 +25,11 @@ def get_debt_detail_keyboard():
 
 @router.message(DebtListStates.selecting_debt)
 async def show_debt_detail(message: Message, state: FSMContext):
+    if message.text == "📋 Назад к меню долгов":
+        await state.clear()
+        await message.answer("💳 Управление долгами:", reply_markup=debts_menu)
+        return
+
     if message.text == "📋 Назад":
         await message.answer("Главное меню долгов:", reply_markup=debts_menu)
         await state.clear()
@@ -70,7 +75,16 @@ async def show_debt_detail(message: Message, state: FSMContext):
 
 @router.message(F.text == "📋 Назад к списку")
 async def back_to_debt_list(message: Message, state: FSMContext):
-    await show_debts_list(message, state)  # вызываем функцию из list.py
+    await state.clear()
+    await show_debts_list(message, state)
+
+@router.message(F.text == "📋 Назад к меню долгов")
+async def back_to_debt_menu(message: Message, state: FSMContext):
+    await state.clear()  # сбрасываем состояние
+    await message.answer(
+        "💳 Управление долгами:",
+        reply_markup=debts_menu  # ← именно эта клавиатура
+    )
 
 # === Закрыть долг (с подтверждением) ===
 @router.message(F.text == "✅ Закрыть долг")
