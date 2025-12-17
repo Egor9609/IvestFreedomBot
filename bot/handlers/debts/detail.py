@@ -3,11 +3,12 @@
 from aiogram import Router, F
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from datetime import date
 
 from bot.states.debt_states import DebtListStates, DebtDetailStates
 from bot.services.debt_service import DebtService
-from bot.keyboards.debts import debts_menu
+from bot.keyboards.debts import debts_menu, confirmation_keyboard
 from bot.handlers.debts.list import show_debts_list
 
 router = Router()
@@ -67,9 +68,33 @@ async def show_debt_detail(message: Message, state: FSMContext):
     await state.set_state(DebtDetailStates.viewing_detail)
     await message.answer(response, reply_markup=get_debt_detail_keyboard())
 
-# === Закрыть долг ===
+@router.message(F.text == "📋 Назад к списку")
+async def back_to_debt_list(message: Message, state: FSMContext):
+    await show_debts_list(message, state)  # вызываем функцию из list.py
+
+# === Закрыть долг (с подтверждением) ===
 @router.message(F.text == "✅ Закрыть долг")
-async def close_debt(message: Message, state: FSMContext):
+async def confirm_close_debt(message: Message, state: FSMContext):
+    await state.set_state(DebtDetailStates.confirming_close)
+    await message.answer(
+        "❓ Вы уверены, что хотите закрыть этот долг?\n"
+        "Остаток будет обнулён, и долг станет неактивным.",
+        reply_markup=confirmation_keyboard()
+    )
+
+# === Удалить долг (с подтверждением) ===
+@router.message(F.text == "❌ Удалить")
+async def confirm_delete_debt(message: Message, state: FSMContext):
+    await state.set_state(DebtDetailStates.confirming_delete)
+    await message.answer(
+        "⚠️ Вы уверены, что хотите удалить этот долг?\n"
+        "⚠️ Удаление невозможно, если по долгу уже были платежи.",
+        reply_markup=confirmation_keyboard()
+    )
+    
+# === Подтверждение: Закрыть долг ===
+@router.message(DebtDetailStates.confirming_close, F.text == "✅ Да")
+async def do_close_debt(message: Message, state: FSMContext):
     data = await state.get_data()
     debt_id = data.get("current_debt_id")
     if not debt_id:
@@ -83,9 +108,14 @@ async def close_debt(message: Message, state: FSMContext):
         await message.answer(f"⚠️ {result['error']}", reply_markup=debts_menu)
     await state.clear()
 
-# === Удалить долг ===
-@router.message(F.text == "❌ Удалить")
-async def delete_debt(message: Message, state: FSMContext):
+@router.message(DebtDetailStates.confirming_close, F.text == "❌ Нет")
+async def cancel_close_debt(message: Message, state: FSMContext):
+    await message.answer("Закрытие отменено.", reply_markup=debts_menu)
+    await state.clear()
+
+# === Подтверждение: Удалить долг ===
+@router.message(DebtDetailStates.confirming_delete, F.text == "✅ Да")
+async def do_delete_debt(message: Message, state: FSMContext):
     data = await state.get_data()
     debt_id = data.get("current_debt_id")
     if not debt_id:
@@ -99,6 +129,7 @@ async def delete_debt(message: Message, state: FSMContext):
         await message.answer(f"⚠️ {result['error']}", reply_markup=debts_menu)
     await state.clear()
 
-@router.message(F.text == "📋 Назад к списку")
-async def back_to_debt_list(message: Message, state: FSMContext):
-    await show_debts_list(message, state)  # вызываем функцию из list.py
+@router.message(DebtDetailStates.confirming_delete, F.text == "❌ Нет")
+async def cancel_delete_debt(message: Message, state: FSMContext):
+    await message.answer("Удаление отменено.", reply_markup=debts_menu)
+    await state.clear()

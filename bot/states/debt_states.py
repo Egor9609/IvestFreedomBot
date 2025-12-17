@@ -13,4 +13,7 @@ class DebtListStates(StatesGroup):
     selecting_debt = State()
 
 class DebtDetailStates(StatesGroup):
+    selecting_debt = State()
     viewing_detail = State()
+    confirming_close = State()
+    confirming_delete = State()
