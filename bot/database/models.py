@@ -51,6 +51,7 @@ class Debt(Base):
     note: Mapped[str] = mapped_column(String, nullable=True)  # для "Другое"
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(MSK))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)  # Активен ли долг (не погашен полностью)
+    is_schedule_created: Mapped[bool] = mapped_column(Boolean, default=False)
 
 class Bill(Base):
     __tablename__ = "bills"
@@ -79,3 +80,15 @@ class DebtPayment(Base):
     debt_id: Mapped[int] = mapped_column(Integer, ForeignKey("debts.id"))
     amount: Mapped[float] = mapped_column(Numeric(10, 2))
     paid_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(MSK))
+
+class PaymentSchedule(Base):
+    __tablename__ = "payment_schedules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    debt_id: Mapped[int] = mapped_column(Integer, ForeignKey("debts.id"))
+    bill_id: Mapped[int] = mapped_column(Integer, ForeignKey("bills.id"), nullable=True)  # если привязан к счёту
+    amount: Mapped[float] = mapped_column(Numeric(10, 2))
+    due_date: Mapped[datetime] = mapped_column(Date)
+    is_paid: Mapped[bool] = mapped_column(Boolean, default=False)
+    paid_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(MSK))

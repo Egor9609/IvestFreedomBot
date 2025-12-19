@@ -159,3 +159,32 @@ class DebtService:
             await session.delete(debt)
             await session.commit()
             return {"success": True}
+
+    @staticmethod
+    async def create_debt_with_schedule(telegram_id: int, description: str, total_amount: float, due_date,
+                                        category: str, note: str, months: int):
+        async for session in get_session():
+            user_repo = UserRepository(session)
+            debt_repo = DebtRepository(session)
+            schedule_repo = PaymentScheduleRepository(session)
+
+            user = await user_repo.get_user_by_telegram_id(telegram_id)
+            debt = Debt(
+                user_id=user.id,
+                telegram_id=telegram_id,
+                description=description,
+                total_amount=total_amount,
+                remaining_amount=total_amount,
+                due_date=due_date,
+                category=category,
+                note=note
+            )
+            session.add(debt)
+            await session.flush()  # получаем debt.id
+
+            # Сразу создаём график
+            await schedule_repo.create_schedule(debt.id, months)
+
+            await session.commit()
+            await session.refresh(debt)
+            return {"success": True, "debt_id": debt.id}

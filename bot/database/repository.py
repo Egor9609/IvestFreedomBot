@@ -6,7 +6,7 @@ import pytz
 from decimal import Decimal
 from dateutil.relativedelta import relativedelta
 
-from bot.database.models import User, Transaction, Debt, Bill, DebtPayment
+from bot.database.models import User, Transaction, Debt, Bill, DebtPayment, PaymentSchedule
 
 MSK = pytz.timezone('Europe/Moscow')
 
@@ -310,15 +310,31 @@ class BillRepository:
         # Если пользователь платит больше — используем его сумму
         actual_amount = user_paid_amount if user_paid_amount is not None else bill.amount
 
-        # Обновляем долг
+        # === НОВОЕ: Работа с графиком платежей ===
         if bill.debt_id:
             debt_repo = DebtRepository(self.session)
             debt = await debt_repo.get_debt_by_id(bill.debt_id)
+
             if debt and debt.is_active:
-                debt.remaining_amount -= actual_amount
-                if debt.remaining_amount <= 0:
-                    debt.is_active = False
-                    debt.remaining_amount = 0
+                # Проверяем, создан ли график
+                if debt.is_schedule_created:
+                    # Используем PaymentSchedule
+                    schedule_repo = PaymentScheduleRepository(self.session)
+                    unpaid_schedules = await schedule_repo.get_unpaid_schedules_by_debt(debt.id)
+
+                    if unpaid_schedules:
+                        # Оплачиваем первый неоплаченный платёж
+                        await schedule_repo.pay_schedule(unpaid_schedules[0].id, actual_amount)
+                    else:
+                        # График закончился, но долг ещё активен — просто уменьшаем остаток
+                        debt.remaining_amount = max(0, debt.remaining_amount - actual_amount)
+                        if debt.remaining_amount <= 0:
+                            debt.is_active = False
+                else:
+                    # График НЕ создан — используем старую логику
+                    debt.remaining_amount = max(0, debt.remaining_amount - actual_amount)
+                    if debt.remaining_amount <= 0:
+                        debt.is_active = False
 
         # Помечаем счёт как оплаченный
         bill.is_paid = True
@@ -394,3 +410,77 @@ class DebtPaymentRepository:
         stmt = select(DebtPayment).where(DebtPayment.debt_id == debt_id)
         result = await self.session.execute(stmt)
         return result.scalars().all()
+
+class PaymentScheduleRepository:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def create_schedule(self, debt_id: int, months: int):
+        """Создаёт график платежей по долгу."""
+        debt_repo = DebtRepository(self.session)
+        debt = await debt_repo.get_debt_by_id(debt_id)
+        if not debt or debt.is_schedule_created:
+            return
+
+        # Рассчитываем первый платёж
+        amount_per_month = debt.remaining_amount / months
+        current_date = datetime.now().date()
+
+        for i in range(months):
+            due_date = current_date + timedelta(days=30 * (i + 1))
+            schedule = PaymentSchedule(
+                debt_id=debt_id,
+                amount=round(amount_per_month, 2),
+                due_date=due_date
+            )
+            self.session.add(schedule)
+
+        debt.is_schedule_created = True
+        await self.session.commit()
+
+    async def get_unpaid_schedules_by_debt(self, debt_id: int):
+        stmt = select(PaymentSchedule).where(
+            PaymentSchedule.debt_id == debt_id,
+            PaymentSchedule.is_paid == False
+        ).order_by(PaymentSchedule.due_date)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def pay_schedule(self, schedule_id: int, actual_amount: float = None):
+        """Оплачивает платёж и пересчитывает график."""
+        schedule = await self.get_schedule_by_id(schedule_id)
+        if not schedule or schedule.is_paid:
+            return None
+
+        # Используем фактическую сумму, если указана
+        amount = actual_amount if actual_amount is not None else schedule.amount
+
+        # Обновляем платёж
+        schedule.is_paid = True
+        schedule.paid_at = datetime.now(MSK)
+        if actual_amount is not None:
+            schedule.amount = actual_amount
+
+        # Обновляем долг
+        debt_repo = DebtRepository(self.session)
+        debt = await debt_repo.get_debt_by_id(schedule.debt_id)
+        debt.remaining_amount = max(0, debt.remaining_amount - amount)
+        if debt.remaining_amount <= 0:
+            debt.is_active = False
+
+        # Пересчитываем оставшиеся платежи
+        if debt.remaining_amount > 0:
+            unpaid = await self.get_unpaid_schedules_by_debt(schedule.debt_id)
+            if unpaid:
+                new_amount = debt.remaining_amount / len(unpaid)
+                for s in unpaid:
+                    s.amount = round(new_amount, 2)
+
+        await self.session.commit()
+        await self.session.refresh(schedule)
+        return schedule
+
+    async def get_schedule_by_id(self, schedule_id: int):
+        stmt = select(PaymentSchedule).where(PaymentSchedule.id == schedule_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()

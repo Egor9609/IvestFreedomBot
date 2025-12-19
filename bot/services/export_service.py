@@ -206,6 +206,18 @@ class ExportService:
                         adjusted_width = min(max_length + 2, 50)
                         worksheet.column_dimensions[column_letter].width = adjusted_width
 
+                # Получаем все платежи по графику
+                schedules = await schedule_repo.get_schedules_by_user(user.id)
+
+                schedule_data = []
+                for s in schedules:
+                    schedule_data.append({
+                        "Дата": s.due_date.strftime("%d.%m.%Y"),
+                        "Сумма": float(s.amount),
+                        "Статус": "Оплачен" if s.is_paid else "Ожидает",
+                        "Долг": debt.description
+                    })
+
             if not paid_bills_df.empty:
                 paid_bills_df.to_excel(writer, index=False, sheet_name="Оплаты по счетам")
             output.seek(0)

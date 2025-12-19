@@ -128,7 +128,8 @@ async def enter_payment_amount(message: Message, state: FSMContext):
     data = await state.get_data()
     remaining = data["remaining"]
     if amount > remaining:
-        await message.answer(f"Сумма не может превышать остаток ({remaining:,.2f} руб.). Попробуйте снова:")
+        amount = remaining
+        await message.answer(f"💡 Сумма превышает остаток. Будет оплачено: {amount:,.2f} руб.")
         return
 
     debt_id = data["selected_debt_id"]
