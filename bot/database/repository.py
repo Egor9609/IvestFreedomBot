@@ -383,7 +383,7 @@ class BillRepository:
             .order_by(Bill.paid_at.desc())
         )
         result = await self.session.execute(stmt)
-        return result.scalars().all()
+        return result.fetchall()
 
 class DebtPaymentRepository:
     def __init__(self, session: AsyncSession):
@@ -484,3 +484,13 @@ class PaymentScheduleRepository:
         stmt = select(PaymentSchedule).where(PaymentSchedule.id == schedule_id)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def get_schedules_by_user(self, user_id: int):
+        stmt = (
+            select(PaymentSchedule, Debt.description)
+            .join(Debt, Debt.id == PaymentSchedule.debt_id)
+            .where(Debt.user_id == user_id)
+            .order_by(PaymentSchedule.due_date)
+        )
+        result = await self.session.execute(stmt)
+        return result.fetchall()

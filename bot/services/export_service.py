@@ -6,6 +6,7 @@ import pytz
 from sqlalchemy import select
 
 from bot.database.repository import UserRepository, TransactionRepository, DebtRepository, DebtPaymentRepository, BillRepository
+from bot.database.repository import PaymentScheduleRepository
 from bot.database.session import get_session
 from bot.database.models import Debt
 
@@ -18,7 +19,8 @@ class ExportService:
         async for session in get_session():
             user_repo = UserRepository(session)
             trans_repo = TransactionRepository(session)
-            debt_repo = DebtRepository(session)  # ✅ Теперь импортировано
+            debt_repo = DebtRepository(session)
+            schedule_repo = PaymentScheduleRepository(session)
 
             user = await user_repo.get_user_by_telegram_id(telegram_id)
             if not user:
@@ -215,7 +217,7 @@ class ExportService:
                         "Дата": s.due_date.strftime("%d.%m.%Y"),
                         "Сумма": float(s.amount),
                         "Статус": "Оплачен" if s.is_paid else "Ожидает",
-                        "Долг": debt.description
+                        "Долг": ebt_desc
                     })
 
             if not paid_bills_df.empty:
