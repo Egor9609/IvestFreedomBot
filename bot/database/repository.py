@@ -486,10 +486,12 @@ class PaymentScheduleRepository:
         return result.scalar_one_or_none()
 
     async def get_schedules_by_user(self, user_id: int):
+        """Получает все платежи по графикам для пользователя."""
         stmt = (
-            select(PaymentSchedule, Debt.description)
+            select(PaymentSchedule, Debt.description.label("debt_description"))
             .join(Debt, Debt.id == PaymentSchedule.debt_id)
-            .where(Debt.user_id == user_id)
+            .join(User, User.id == Debt.user_id)
+            .where(User.id == user_id)
             .order_by(PaymentSchedule.due_date)
         )
         result = await self.session.execute(stmt)

@@ -208,17 +208,39 @@ class ExportService:
                         adjusted_width = min(max_length + 2, 50)
                         worksheet.column_dimensions[column_letter].width = adjusted_width
 
-                # Получаем все платежи по графику
+                # === График платежей ===
                 schedules = await schedule_repo.get_schedules_by_user(user.id)
+                schedules_df = pd.DataFrame()
 
-                schedule_data = []
-                for s in schedules:
-                    schedule_data.append({
-                        "Дата": s.due_date.strftime("%d.%m.%Y"),
-                        "Сумма": float(s.amount),
-                        "Статус": "Оплачен" if s.is_paid else "Ожидает",
-                        "Долг": ebt_desc
-                    })
+                if schedules:
+                    schedule_data = []
+                    for row in schedules:
+                        # row[0] — это объект PaymentSchedule
+                        # row.debt_description — это описание долга
+                        s = row[0]
+                        debt_desc = row.debt_description or "—"
+                        schedule_data.append({
+                            "Дата": s.due_date.strftime("%d.%m.%Y"),
+                            "Сумma": float(s.amount),
+                            "Статус": "Оплачен" if s.is_paid else "Ожидает",
+                            "Долг": debt_desc
+                        })
+                    schedules_df = pd.DataFrame(schedule_data)
+
+                    # Добавляем лист в Excel
+                    schedules_df.to_excel(writer, index=False, sheet_name="График платежей")
+                    worksheet = writer.sheets["График платежей"]
+                    for column in worksheet.columns:
+                        max_length = 0
+                        column_letter = column[0].column_letter
+                        for cell in column:
+                            try:
+                                if len(str(cell.value)) > max_length:
+                                    max_length = len(str(cell.value))
+                            except:
+                                pass
+                        adjusted_width = min(max_length + 2, 50)
+                        worksheet.column_dimensions[column_letter].width = adjusted_width
 
             if not paid_bills_df.empty:
                 paid_bills_df.to_excel(writer, index=False, sheet_name="Оплаты по счетам")
